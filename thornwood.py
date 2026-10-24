@@ -101,106 +101,209 @@ TREE_SPEC = {
 # ======================================================================
 
 def neighbours(r, c):
-    """Return the in-map neighbours of (r, c) as (direction, (r, c)) pairs,
-    in neighbour order up, right, down, left."""
-    # TODO
-    raise NotImplementedError
+    """Return in-map neighbours in up, right, down, left order."""
+    result = []
+    for direction, (dr, dc) in enumerate(DIRECTIONS):
+        nr, nc = r + dr, c + dc
+        if 0 <= nr < len(GRID) and 0 <= nc < len(GRID[0]):
+            result.append((direction, (nr, nc)))
+    return result
 
 
 def hill_climb(start):
-    """Steepest-ascent hill climbing from start.
-
-    Move to the highest neighbour only if strictly higher than current;
-    ties go to the first in neighbour order. Return (final_cell, value, steps).
-    """
-    # TODO
-    raise NotImplementedError
+    """Steepest-ascent hill climbing; return (final_cell, value, steps)."""
+    cell = start
+    steps = 0
+    while True:
+        r, c = cell
+        current_value = GRID[r][c]
+        best_cell = cell
+        best_value = current_value
+        for _, (nr, nc) in neighbours(r, c):
+            value = GRID[nr][nc]
+            if value > best_value:
+                best_value = value
+                best_cell = (nr, nc)
+        if best_cell == cell:
+            return cell, current_value, steps
+        cell = best_cell
+        steps += 1
 
 
 def random_restart(starts):
-    """Run hill_climb from each start in order.
+    """Run hill climbing from each start and return best value, first start, total steps."""
+    best_value = None
+    best_start = None
+    total_steps = 0
+    for start in starts:
+        _, value, steps = hill_climb(start)
+        total_steps += steps
+        if best_value is None or value > best_value:
+            best_value = value
+            best_start = start
+    return best_value, best_start, total_steps
 
-    Return (best_value, start_of_first_climb_reaching_it, total_steps).
-    """
-    # TODO
-    raise NotImplementedError
 
+def simulated_annealing(seed, start_temperature=20.0):
+    """Run the specified 200-step simulated annealing procedure."""
+    rng = random.Random(seed)
+    current = (0, 0)
+    current_value = GRID[current[0]][current[1]]
+    best_value = current_value
+    temperature = start_temperature
+    accepted = 0
 
-def simulated_annealing(seed):
-    """Simulated annealing per Scroll Box 1, Part C.
+    for _ in range(200):
+        direction = int(rng.random() * 4)
+        dr, dc = DIRECTIONS[direction]
+        nr, nc = current[0] + dr, current[1] + dc
+        if 0 <= nr < len(GRID) and 0 <= nc < len(GRID[0]):
+            neighbour = (nr, nc)
+            neighbour_value = GRID[nr][nc]
+            delta = neighbour_value - current_value
+            move = delta >= 0
+            if delta < 0:
+                move = rng.random() < math.exp(delta / temperature)
+            if move:
+                current = neighbour
+                current_value = neighbour_value
+                accepted += 1
+                if current_value > best_value:
+                    best_value = current_value
+        temperature *= 0.97
 
-    rng = random.Random(seed); start (0,0); T = 20.0; 200 iterations;
-    cool T *= 0.97 EVERY iteration (even skipped ones); draw r only if delta < 0.
-    Return (final_cell, final_value, best_value, accepted_count).
-    """
-    # TODO
-    raise NotImplementedError
+    return current, current_value, best_value, accepted
 
 
 def fate_test(seeds):
-    """Count how many seeded SA runs end with final value 95."""
-    # TODO
-    raise NotImplementedError
-
+    """Count seeded simulated-annealing runs ending at value 95."""
+    count = 0
+    for seed in seeds:
+        final_cell, final_value, _, _ = simulated_annealing(seed)
+        if final_value == 95:
+            count += 1
+    return count
 
 # ======================================================================
 # MISSION 2: Tool pouch (Scroll Box 2)
 # ======================================================================
 
 def fitness(chrom):
-    """Total usefulness of packed tools if load <= 86 and volume <= 44, else 0.
-
-    chrom is a list of 15 ints (0/1).
-    """
-    # TODO
-    raise NotImplementedError
+    """Return usefulness if both pouch limits are respected; otherwise zero."""
+    total_load = 0
+    total_volume = 0
+    total_usefulness = 0
+    for bit, (load, volume, usefulness) in zip(chrom, TOOLS):
+        if bit:
+            total_load += load
+            total_volume += volume
+            total_usefulness += usefulness
+    if total_load <= MAX_LOAD and total_volume <= MAX_VOLUME:
+        return total_usefulness
+    return 0
 
 
 def rank_population(pop):
-    """Return population indices sorted by fitness high->low; ties go to the
-    lower position."""
-    # TODO
-    raise NotImplementedError
+    """Indices ranked by fitness descending, then original position ascending."""
+    return sorted(range(len(pop)), key=lambda i: (-fitness(pop[i]), i))
 
 
 def tournament(pop, rng):
-    """Draw three positions with int(rng.random() * 20); highest fitness wins,
-    ties go to the one drawn first. Return the winning chromosome."""
-    # TODO
-    raise NotImplementedError
+    """Select the fittest of three drawn positions; ties favor first drawn."""
+    draws = [int(rng.random() * 20) for _ in range(3)]
+    winner_index = draws[0]
+    winner_fitness = fitness(pop[winner_index])
+    for index in draws[1:]:
+        candidate_fitness = fitness(pop[index])
+        if candidate_fitness > winner_fitness:
+            winner_index = index
+            winner_fitness = candidate_fitness
+    return pop[winner_index]
 
 
 def crossover(p1, p2, rng):
-    """Draw rng.random(); if < 0.9, draw cut = int(rng.random() * 14) + 1 and
-    swap tails; else copy parents (no cut drawn). Return NEW lists (c1, c2)."""
-    # TODO
-    raise NotImplementedError
+    """Apply one-point crossover with probability 0.9, returning independent lists."""
+    if rng.random() < 0.9:
+        cut = int(rng.random() * 14) + 1
+        child1 = list(p1[:cut]) + list(p2[cut:])
+        child2 = list(p2[:cut]) + list(p1[cut:])
+    else:
+        child1 = list(p1)
+        child2 = list(p2)
+    return child1, child2
 
 
 def mutate(chrom, rng):
-    """For bits 0..14 in order, draw rng.random() and flip if < 1/15.
-    Return a NEW list."""
-    # TODO
-    raise NotImplementedError
+    """Mutate each bit independently with probability 1/15; return a new list."""
+    child = list(chrom)
+    for i in range(15):
+        if rng.random() < 1 / 15:
+            child[i] = 1 - child[i]
+    return child
 
 
 def genetic_algorithm(seed=12, generations=50):
-    """Run the GA from GEN0 with rng = random.Random(seed).
+    """Run the specified genetic algorithm and return data for GA report lines."""
+    rng = random.Random(seed)
+    population = [[int(bit) for bit in chromosome] for chromosome in GEN0]
+    generation_best = {}
+    best_chromosome = None
+    best_fitness = None
+    first_generation = None
+    final_average = 0.0
 
-    Per generation: evaluate/rank/record, elitism (rank 1, rank 2), then
-    selection -> crossover -> mutation (child 1 then child 2) until 20 members.
-    Return the data needed for the GA_* report lines.
-    """
-    # TODO
-    raise NotImplementedError
+    for generation in range(generations + 1):
+        ranked = rank_population(population)
+        fitnesses = [fitness(chrom) for chrom in population]
+        top_index = ranked[0]
+        top_fitness = fitnesses[top_index]
+        top_chromosome = population[top_index]
+        generation_best[generation] = top_fitness
+        final_average = sum(fitnesses) / len(fitnesses)
+
+        if generation == generations:
+            best_chromosome = ''.join(map(str, top_chromosome))
+            best_fitness = top_fitness
+            first_generation = next(
+                g for g in range(generations + 1)
+                if generation_best[g] == best_fitness
+            )
+            break
+
+        next_population = [
+            list(population[ranked[0]]),
+            list(population[ranked[1]])
+        ]
+        while len(next_population) < 20:
+            parent1 = tournament(population, rng)
+            parent2 = tournament(population, rng)
+            child1, child2 = crossover(parent1, parent2, rng)
+            next_population.append(mutate(child1, rng))
+            next_population.append(mutate(child2, rng))
+        population = next_population
+
+    checkpoints = [generation_best[g] for g in (0, 10, 20, 30, 40, generations)]
+    return {
+        "generation_best": checkpoints,
+        "best_chromosome": best_chromosome,
+        "best_fitness": best_fitness,
+        "first_generation": first_generation,
+        "final_average": final_average,
+        "history": generation_best,
+    }
 
 
 def brute_force_optimum():
-    """Exact optimum over all 2^15 pouches (or a 2-constraint DP).
-    Return (best_fitness, chromosome_string)."""
-    # TODO
-    raise NotImplementedError
-
+    """Find the exact best pouch by examining all 2^15 bit combinations."""
+    best_fitness = -1
+    best_chromosome = None
+    for mask in range(1 << 15):
+        chrom = [(mask >> bit) & 1 for bit in range(15)]
+        score = fitness(chrom)
+        if score > best_fitness:
+            best_fitness = score
+            best_chromosome = ''.join(map(str, chrom))
+    return best_fitness, best_chromosome
 
 # ======================================================================
 # MISSION 3: Stone Drop (Scroll Box 3)
