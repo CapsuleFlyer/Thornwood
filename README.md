@@ -28,6 +28,15 @@ README.md
 extras/             NOT part of the submission
   debrief_runs.py   extra experiments the debrief asks for
   debrief.md        source text for debrief.pdf
+  export_visual_data.py   builds visual.html from thornwood.py's own results
+  visual_template.html    page template used by the exporter
+  visual.html             interactive replay of the Stone Drop duel and Master Hyo's tree
+```
+
+To rebuild the interactive page after changing the code:
+
+```bash
+python extras/export_visual_data.py
 ```
 
 ## Missions
