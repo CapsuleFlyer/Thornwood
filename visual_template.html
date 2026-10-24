@@ -1,0 +1,866 @@
+<title>Thornwood Replay</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: one manga page. Three ruled panels on a halftone sheet,
+   black ink for everything, a single red hanko-stamp colour for whatever the
+   reader should look at (last stone, winning four, the cut that just fired). */
+:root {
+  --paper: #f3f4f5;
+  --panel: #ffffff;
+  --ink: #111215;
+  --ink-soft: #484b52;
+  --faint: #c4c7cd;
+  --hatch: #e3e5e8;
+  --red: #c1271d;
+  --on-red: #ffffff;
+  --display: "Dela Gothic One", Impact, "Arial Black", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d0e11; --panel: #15161a; --ink: #ecebe7; --ink-soft: #a6a9b0;
+    --faint: #383b42; --hatch: #202228; --red: #f0614f; --on-red: #0d0e11;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d0e11; --panel: #15161a; --ink: #ecebe7; --ink-soft: #a6a9b0;
+  --faint: #383b42; --hatch: #202228; --red: #f0614f; --on-red: #0d0e11;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.page { max-width: 980px; margin: 0 auto; display: grid; gap: 28px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- masthead ---------- */
+.masthead {
+  border: 3px solid var(--ink);
+  background:
+    radial-gradient(var(--faint) 1.3px, transparent 1.6px) 0 0 / 9px 9px,
+    var(--panel);
+  padding: 22px 22px 20px;
+  display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+}
+.masthead .text { min-width: 0; flex: 1 1 320px; }
+.masthead h1 { font-family: var(--display); font-size: clamp(2rem, 7.4vw, 3.6rem); line-height: 1; letter-spacing: .01em; }
+.lede { margin: 12px 0 0; max-width: 56ch; background: var(--panel); display: inline; padding: 2px 6px 2px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.stamp {
+  flex: 0 0 auto; width: 104px; height: 104px; border-radius: 50%;
+  border: 4px solid var(--red); color: var(--red); background: var(--panel);
+  display: grid; place-items: center; text-align: center; transform: rotate(-9deg);
+  font-family: var(--display); line-height: 1.05; font-size: 1rem;
+  box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 5px var(--red);
+}
+.stamp small { display: block; font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; margin-bottom: 2px; }
+
+/* ---------- panels ---------- */
+.panel {
+  border: 3px solid var(--ink); background: var(--panel);
+  box-shadow: 7px 7px 0 var(--ink);
+  padding: 20px; min-width: 0;
+  margin-right: 7px; margin-bottom: 7px;
+}
+.panel-head { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+.badge {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%;
+  border: 3px solid var(--red); color: var(--red);
+  display: grid; place-items: center; font-family: var(--display); font-size: 1.2rem; line-height: 1;
+}
+.panel-head h2 { font-family: var(--display); font-size: clamp(1.25rem, 4.4vw, 1.75rem); line-height: 1.1; }
+.panel-head p { margin: 2px 0 0; color: var(--ink-soft); font-size: .9rem; }
+
+/* ---------- Stone Drop ---------- */
+.duel { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 26px; align-items: start; }
+.board-col { min-width: 0; }
+.colpick { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-bottom: 8px; }
+.colbtn {
+  background: var(--panel); border: 2px solid var(--ink); margin-left: -2px; padding: 6px 2px 5px;
+  min-height: 52px; display: grid; gap: 1px; justify-items: center; align-content: center;
+}
+.colbtn:first-child { margin-left: 0; }
+.colbtn b { font-family: var(--display); font-weight: 400; font-size: 1.25rem; line-height: 1; }
+.colbtn small { font-family: var(--mono); font-size: .66rem; letter-spacing: .04em; text-transform: uppercase; }
+.colbtn[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.colbtn:focus-visible { position: relative; z-index: 1; }
+.board { display: block; width: 100%; height: auto; }
+.board .frame { fill: var(--panel); stroke: var(--ink); stroke-width: 3; }
+.board .hole { fill: none; stroke: var(--faint); stroke-width: 2; stroke-dasharray: 3 5; }
+.board .stone-x { fill: var(--ink); }
+.board .stone-o { fill: var(--panel); stroke: var(--ink); stroke-width: 4; }
+.board .last { fill: none; stroke: var(--red); stroke-width: 3; }
+.board .win { fill: none; stroke: var(--red); stroke-width: 4; }
+.board .thread { stroke: var(--red); stroke-width: 7; stroke-linecap: round; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--ink-soft); font-size: .82rem; }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.legend svg { width: 16px; height: 16px; flex: none; }
+
+.transport { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.btn { border: 2px solid var(--ink); background: var(--panel); padding: 6px 14px; min-height: 40px; font-weight: 600; }
+.btn:hover:not(:disabled) { background: var(--ink); color: var(--panel); }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn.primary { background: var(--ink); color: var(--panel); }
+.btn.primary:hover:not(:disabled) { background: var(--red); border-color: var(--red); color: var(--on-red); }
+.scrub { flex: 1 1 140px; min-width: 120px; accent-color: var(--red); height: 28px; margin: 0; }
+.count { font-family: var(--mono); font-size: .8rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.story { min-width: 0; display: grid; gap: 14px; }
+.story h3 { font-family: var(--display); font-size: 1.3rem; line-height: 1.15; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chip { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; border: 2px solid var(--ink); padding: 1px 8px; background: var(--panel); }
+.chip.win { background: var(--ink); color: var(--panel); }
+.note { border: 2px dashed var(--ink); padding: 12px 14px; min-height: 5.4em; }
+.note p { margin: 0; }
+.note p + p { margin-top: 6px; }
+.note strong { font-weight: 600; }
+.moves { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.mv { border: 2px solid var(--ink); background: var(--panel); font-family: var(--mono); font-size: .8rem; padding: 3px 9px; min-height: 32px; }
+.mv[aria-current="step"] { background: var(--red); border-color: var(--red); color: var(--on-red); }
+.mv .who { font-weight: 600; }
+.mini { color: var(--ink-soft); font-size: .85rem; margin: 0; }
+
+/* ---------- ki bars ---------- */
+.ki-group + .ki-group { margin-top: 20px; }
+.ki-group h3 { font-family: var(--mono); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-soft); margin-bottom: 8px; }
+.ki-row { display: grid; grid-template-columns: 170px minmax(0, 1fr) 150px; gap: 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--faint); }
+.ki-label { font-weight: 500; }
+.ki-label small { display: block; color: var(--ink-soft); font-weight: 400; font-size: .78rem; }
+.ki-track { height: 20px; background: repeating-linear-gradient(90deg, var(--hatch) 0 1px, transparent 1px 10%); border-left: 2px solid var(--ink); }
+.ki-bar { height: 100%; background: var(--ink); min-width: 3px; transition: width .4s ease; }
+.ki-bar.ab { background: var(--red); }
+.ki-num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; font-weight: 500; }
+.ki-num small { display: block; color: var(--ink-soft); font-weight: 400; font-size: .76rem; }
+.ki-take { margin: 16px 0 0; max-width: 70ch; }
+
+/* ---------- tree ---------- */
+.tree-bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 12px; }
+.seg { display: inline-flex; }
+.seg button { border: 2px solid var(--ink); background: var(--panel); padding: 6px 12px; min-height: 40px; font-weight: 600; margin-left: -2px; }
+.seg button:first-child { margin-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.seg button:focus-visible { position: relative; z-index: 1; }
+.tree-note { border: 2px dashed var(--ink); padding: 12px 14px; margin: 12px 0 14px; min-height: 4.6em; }
+.tree-note p { margin: 0; }
+.tree-note .mono { font-size: .88em; }
+.tree-scroll { overflow-x: auto; padding-bottom: 4px; }
+.tree { min-width: 0; }
+.n { margin: 6px 0 0; }
+.n-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 4px 8px; border: 2px solid transparent; }
+.n-name { font-family: var(--mono); font-weight: 600; }
+.n-kind { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; color: var(--ink-soft); border: 1px solid var(--faint); padding: 0 5px; }
+.n-win { font-family: var(--mono); font-size: .78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.n-val { font-family: var(--mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tag { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--red); border: 1.5px solid var(--red); padding: 0 6px; }
+.n-kids { margin-left: 12px; padding-left: 10px; border-left: 2px solid var(--faint); }
+.n.idle > .n-head { opacity: .5; border-style: dashed; border-color: var(--faint); }
+.n.active > .n-head { border-color: var(--ink); }
+.n.current > .n-head { border-color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+.n.cut > .n-head { opacity: .5; background: repeating-linear-gradient(135deg, var(--hatch) 0 4px, transparent 4px 8px); }
+.n.cut > .n-head .n-name { text-decoration: line-through; }
+.leaves { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 2px 12px; padding-left: 10px; }
+.lf { font-family: var(--mono); font-size: .78rem; border: 2px dashed var(--faint); color: var(--ink-soft); padding: 1px 7px; font-variant-numeric: tabular-nums; }
+.lf.seen { border: 2px solid var(--ink); color: var(--ink); background: var(--panel); }
+.lf.current { background: var(--red); border-color: var(--red); color: var(--on-red); }
+.lf.cut { border-style: solid; border-color: var(--faint); background: repeating-linear-gradient(135deg, var(--hatch) 0 3px, transparent 3px 6px); text-decoration: line-through; }
+
+
+/* ---------- Mission 1 / 2 ---------- */
+.grid-svg { display: block; width: 100%; height: auto; }
+.grid-svg .cell { stroke: var(--panel); stroke-width: 1; }
+.grid-svg .cnum { font-family: var(--mono); font-size: 11px; fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.grid-svg .trail { fill: none; stroke: var(--red); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; opacity: .35; }
+.grid-svg .startring { fill: none; stroke: var(--ink); stroke-width: 3; stroke-dasharray: 4 3; }
+.grid-svg .peak { fill: none; stroke: var(--ink); stroke-width: 2.5; }
+.grid-svg .here { fill: var(--red); stroke: var(--panel); stroke-width: 2; }
+.ctl { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.ctl-label { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); }
+.seeds { width: 100%; display: grid; grid-template-columns: repeat(10, 1fr); gap: 0; max-width: 420px; padding-right: 2px; }
+.seed { border: 2px solid var(--ink); margin: 0 -2px -2px 0; background: var(--panel); font-family: var(--mono); font-size: .74rem; min-height: 34px; padding: 0; }
+.seed.ok { background: var(--hatch); font-weight: 600; }
+.seed[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: var(--on-red); position: relative; z-index: 1; }
+.seed:focus-visible { position: relative; z-index: 2; }
+.glossary { margin: 0; color: var(--ink-soft); font-size: .82rem; }
+.chart { display: block; width: 100%; height: auto; }
+.chart text { font-family: var(--mono); font-size: 10px; fill: var(--ink-soft); }
+.chart .axis { stroke: var(--ink); stroke-width: 2; fill: none; }
+.chart .gridl { stroke: var(--faint); stroke-width: 1; }
+.chart .l-best { stroke: var(--ink); stroke-width: 3; fill: none; }
+.chart .l-avg { stroke: var(--ink-soft); stroke-width: 2; fill: none; stroke-dasharray: 5 4; }
+.chart .l-opt { stroke: var(--red); stroke-width: 2; stroke-dasharray: 2 4; }
+.chart .l-opt-t { fill: var(--red); }
+.chart .cur { stroke: var(--red); stroke-width: 2; }
+.chart .dot { fill: var(--red); }
+.pouch { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.pouch th { font-family: var(--mono); font-weight: 600; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); text-align: right; padding: 3px 6px; border-bottom: 2px solid var(--ink); }
+.pouch th:first-child, .pouch td:first-child { text-align: left; }
+.pouch td { text-align: right; padding: 2px 6px; border-bottom: 1px solid var(--faint); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pouch td:first-child { font-family: var(--body); }
+.pouch tr.off td { color: var(--ink-soft); opacity: .55; }
+.pouch tr.on td:first-child { font-weight: 600; }
+.pouch tr.on td:nth-child(2) { color: var(--red); font-weight: 600; }
+.pouch tfoot td { border-top: 2px solid var(--ink); border-bottom: 0; font-weight: 600; }
+.bits { display: flex; gap: 2px; flex-wrap: wrap; }
+.bit { width: 22px; height: 26px; border: 2px solid var(--ink); display: grid; place-items: center; font-family: var(--mono); font-size: .72rem; background: var(--panel); }
+.bit.one { background: var(--ink); color: var(--panel); }
+.bit.diff { border-color: var(--red); box-shadow: 0 0 0 2px var(--red); position: relative; z-index: 1; }
+.bitrow { display: grid; grid-template-columns: 74px 1fr; gap: 8px; align-items: center; margin-top: 6px; }
+.bitrow span.ctl-label { text-transform: none; letter-spacing: 0; }
+
+@media (max-width: 760px) {
+  .duel { grid-template-columns: minmax(0, 1fr); }
+  .ki-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label num" "track track"; row-gap: 6px; }
+  .ki-label { grid-area: label; } .ki-num { grid-area: num; } .ki-track { grid-area: track; }
+  .panel { padding: 16px; }
+  .masthead { padding: 18px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main class="page">
+  <header class="masthead">
+    <div class="text">
+      <h1>Thornwood Rescue</h1>
+      <p class="lede" id="lede"></p>
+    </div>
+    <div class="stamp" id="stamp" aria-label="Mission status"></div>
+  </header>
+
+  <section class="panel" aria-labelledby="h-climb">
+    <div class="panel-head">
+      <div class="badge" aria-hidden="true">1</div>
+      <div>
+        <h2 id="h-climb">The false summit</h2>
+        <p>Climb the safety map. Each cell is a spot in the forest, the number is how safe it is.</p>
+      </div>
+    </div>
+    <div class="duel">
+      <div class="board-col">
+        <div class="seg" role="group" aria-label="Search method" style="margin-bottom:10px">
+          <button type="button" id="wHc" aria-pressed="true">Hill climbing</button>
+          <button type="button" id="wSa" aria-pressed="false">Annealing</button>
+        </div>
+        <svg class="grid-svg" id="gridSvg" viewBox="0 0 320 320" role="img" aria-label="Safety map"></svg>
+        <ul class="legend">
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="var(--red)"/></svg>Where the searcher is now</li>
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="var(--ink)" stroke-width="2"/></svg>Highest cell (95)</li>
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="3 2"/></svg>Start</li>
+        </ul>
+        <div class="transport">
+          <button class="btn" id="wBack" type="button">Back</button>
+          <button class="btn primary" id="wPlay" type="button">Play</button>
+          <input class="scrub" id="wScrub" type="range" min="0" max="1" value="0" aria-label="Climb step">
+          <span class="count" id="wCount"></span>
+        </div>
+      </div>
+      <div class="story">
+        <h3 id="wTitle"></h3>
+        <div class="ctl" id="wCtl"></div>
+        <div class="note" id="wNote" aria-live="polite"></div>
+        <p class="mini" id="wMini"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-seed">
+    <div class="panel-head">
+      <div class="badge" aria-hidden="true">2</div>
+      <div>
+        <h2 id="h-seed">Rin's seedcraft</h2>
+        <p>Fifty generations of a genetic algorithm packing the pouch, checked against every possible pouch.</p>
+      </div>
+    </div>
+    <div class="duel">
+      <div class="board-col">
+        <svg class="chart" id="chart" viewBox="0 0 400 270" role="img" aria-label="Fitness by generation"></svg>
+        <ul class="legend">
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><line x1="1" y1="8" x2="15" y2="8" stroke="var(--ink)" stroke-width="3"/></svg>Best pouch in the generation</li>
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><line x1="1" y1="8" x2="15" y2="8" stroke="var(--ink-soft)" stroke-width="2" stroke-dasharray="3 2"/></svg>Population average</li>
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><line x1="1" y1="8" x2="15" y2="8" stroke="var(--red)" stroke-width="2" stroke-dasharray="2 3"/></svg>True best (brute force)</li>
+        </ul>
+        <div class="transport">
+          <button class="btn" id="gBack" type="button">Back</button>
+          <button class="btn primary" id="gPlay" type="button">Play</button>
+          <input class="scrub" id="gScrub" type="range" min="0" max="1" value="0" aria-label="Generation">
+          <span class="count" id="gCount"></span>
+        </div>
+      </div>
+      <div class="story">
+        <h3 id="gTitle"></h3>
+        <div class="note" id="gNote" aria-live="polite"></div>
+        <table class="pouch" id="pouch"></table>
+        <div id="gBits"></div>
+        <p class="mini" id="gMini"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-stone">
+    <div class="panel-head">
+      <div class="badge" aria-hidden="true">3</div>
+      <div>
+        <h2 id="h-stone">Stone Drop duel</h2>
+        <p>Pick a first move. The board then plays out best play on both sides.</p>
+      </div>
+    </div>
+    <div class="duel">
+      <div class="board-col">
+        <div class="colpick" id="colpick" role="group" aria-label="First move for the Pine team"></div>
+        <svg class="board" id="board" viewBox="0 0 280 280" role="img" aria-label="Stone Drop board"></svg>
+        <ul class="legend">
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ink)"/></svg>Pine team (X)</li>
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--panel)" stroke="var(--ink)" stroke-width="2.5"/></svg>Vesper (O)</li>
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="var(--red)" stroke-width="2"/></svg>Last stone, or the winning four</li>
+        </ul>
+        <div class="transport">
+          <button class="btn" id="sBack" type="button">Back</button>
+          <button class="btn primary" id="sFwd" type="button">Next stone</button>
+          <input class="scrub" id="sScrub" type="range" min="0" max="1" value="0" aria-label="Stone Drop step">
+          <span class="count" id="sCount"></span>
+        </div>
+      </div>
+      <div class="story">
+        <h3 id="sTitle"></h3>
+        <div class="note" id="sNote" aria-live="polite"></div>
+        <ol class="moves" id="sMoves" aria-label="Moves in this line"></ol>
+        <p class="mini" id="sMini"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-ki">
+    <div class="panel-head">
+      <div class="badge" aria-hidden="true">4</div>
+      <div>
+        <h2 id="h-ki">Ki spent</h2>
+        <p>Positions each search had to look at, from the same starting board.</p>
+      </div>
+    </div>
+    <div id="ki"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-tree">
+    <div class="panel-head">
+      <div class="badge" aria-hidden="true">4</div>
+      <div>
+        <h2 id="h-tree">Master Hyo's trial tree</h2>
+        <p>Step through the alpha-beta search. Hatched nodes were never looked at.</p>
+      </div>
+    </div>
+    <div class="tree-bar">
+      <div class="seg" role="group" aria-label="Search direction">
+        <button type="button" id="mLr" aria-pressed="true"></button>
+        <button type="button" id="mRl" aria-pressed="false"></button>
+      </div>
+      <span class="count" id="tLeaves"></span>
+    </div>
+    <div class="transport">
+      <button class="btn" id="tBack" type="button">Back</button>
+      <button class="btn" id="tFwd" type="button">Forward</button>
+      <button class="btn primary" id="tPlay" type="button">Play</button>
+      <input class="scrub" id="tScrub" type="range" min="0" max="1" value="0" aria-label="Tree search step">
+      <span class="count" id="tCount"></span>
+    </div>
+    <div class="tree-note" id="tNote" aria-live="polite"></div>
+    <div class="tree-scroll"><div class="tree" id="tree"></div></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var D = /*__DATA__*/null;
+  var MINUS = "−", INFTY = "∞";
+  var $ = function (id) { return document.getElementById(id); };
+
+  function num(v) {
+    if (v === "inf") return INFTY;
+    if (v === "-inf") return MINUS + INFTY;
+    if (typeof v !== "number") return String(v);
+    var s = Math.abs(v).toLocaleString("en-US");
+    return v < 0 ? MINUS + s : s;
+  }
+
+  /* ---------- masthead ---------- */
+  var best = D.moves.reduce(function (bi, m, i) { return m.value > D.moves[bi].value ? i : bi; }, 0);
+  var c1 = D.m1.climbs, c2 = D.m2;
+  var bestClimb = c1.filter(function (c) { return c.start[0] === D.m1.bestStart[0] && c.start[1] === D.m1.bestStart[1]; })[0];
+  $("lede").textContent =
+    "Hill climbing from (" + c1[0].start + ") stalls at " + c1[0].value + ", but a restart from (" + D.m1.bestStart +
+    ") reaches " + bestClimb.value + ". The seed pouch scores " + c2.ga.fitness + " against a true best of " + c2.opt.fitness +
+    ". Pine team's only winning first move is column " + D.moves[best].col +
+    ", and Master Hyo's tree is worth " + num(D.treeSummary.value) + " through branch " + D.treeSummary.move + ".";
+  $("stamp").innerHTML = "<span><small>MISSION</small>" + D.status + "</span>";
+
+
+  /* ---------- Mission 1: the false summit ---------- */
+  (function () {
+    var M = D.m1, G = M.grid, N = G.length, CELL = 40;
+    var DN = ["up", "right", "down", "left"], DV = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+    var lo = Infinity, hi = -Infinity, peak = [0, 0];
+    G.forEach(function (row, r) { row.forEach(function (v, c) {
+      if (v < lo) lo = v;
+      if (v > hi) { hi = v; peak = [r, c]; }
+    }); });
+    var W = { mode: "hc", start: 0, heat: "20", seed: 1, step: 0, timer: null };
+    var cache = {};
+    var bestClimb = M.climbs.filter(function (c) { return c.start[0] === M.bestStart[0] && c.start[1] === M.bestStart[1]; })[0];
+
+    function saRun() { return M.runs[W.heat][String(W.seed)]; }
+    function saPath(run) {
+      var key = W.heat + "/" + W.seed;
+      if (cache[key]) return cache[key];
+      var cur = [0, 0], p = [[0, 0]];
+      run.a.forEach(function (a, i) {
+        if (a === 1) cur = [cur[0] + DV[run.d[i]][0], cur[1] + DV[run.d[i]][1]];
+        p.push(cur.slice());
+      });
+      return (cache[key] = p);
+    }
+    function path() { return W.mode === "hc" ? M.climbs[W.start].path : saPath(saRun()); }
+    function last() { return path().length - 1; }
+    function at(p) { return G[p[0]][p[1]]; }
+    function ctr(p) { return [p[1] * CELL + CELL / 2, p[0] * CELL + CELL / 2]; }
+    function pt(p) { var q = ctr(p); return q[0] + "," + q[1]; }
+
+    function draw() {
+      var P = path(), i = Math.min(W.step, P.length - 1), svg = "";
+      var nums = "";
+      for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+        var v = G[r][c], pc = ((v - lo) / (hi - lo) * 38).toFixed(1);
+        svg += '<rect class="cell" x="' + c * CELL + '" y="' + r * CELL + '" width="' + CELL + '" height="' + CELL +
+               '" style="fill:color-mix(in srgb, var(--ink) ' + pc + '%, var(--panel))"/>';
+        nums += '<text class="cnum" x="' + (c * CELL + CELL / 2) + '" y="' + (r * CELL + CELL / 2) + '">' + v + "</text>";
+      }
+      var s0 = ctr(P[0]);
+      if (i > 0) svg += '<polyline class="trail" points="' + P.slice(0, i + 1).map(pt).join(" ") + '"/>';
+      svg += nums;
+      svg += '<rect class="peak" x="' + (peak[1] * CELL + 2) + '" y="' + (peak[0] * CELL + 2) + '" width="' + (CELL - 4) + '" height="' + (CELL - 4) + '"/>';
+      svg += '<rect class="startring" x="' + (s0[0] - 17) + '" y="' + (s0[1] - 17) + '" width="34" height="34"/>';
+      var h = ctr(P[i]);
+      svg += '<circle class="here" cx="' + h[0] + '" cy="' + h[1] + '" r="9"/>';
+      $("gridSvg").innerHTML = svg;
+      $("gridSvg").setAttribute("aria-label", "Safety map, searcher at row " + P[i][0] + ", column " + P[i][1] + ", safety " + at(P[i]));
+    }
+
+    function note() {
+      var P = path(), i = Math.min(W.step, P.length - 1), cur = P[i];
+      if (W.mode === "hc") {
+        var cl = M.climbs[W.start];
+        if (i === 0) return "<p><strong>Start</strong> at (" + cur + ") with safety " + at(cur) + ". Look at the four neighbours and step to the highest one, if it beats here.</p>";
+        var out = "<p><strong>Step " + i + ".</strong> Move to (" + cur + "), safety " + at(P[i - 1]) + " " + "→ " + at(cur) + ".</p>";
+        if (i === P.length - 1) out += at(cur) === hi
+          ? "<p>No neighbour is higher. This is the true summit, " + hi + ", reached in " + cl.steps + " steps.</p>"
+          : "<p>No neighbour is higher, so the climb stops at " + at(cur) + ". This is a <strong>false summit</strong>: the real peak of " + hi + " is out of reach by small steps.</p>";
+        return out;
+      }
+      var run = saRun(), T0 = +W.heat;
+      if (i === 0) return "<p><strong>Start</strong> at (0,0), safety " + G[0][0] + ", heat " + T0 + ". Each turn: draw a direction, and downhill moves are accepted with a chance that shrinks as the heat falls (×0.97 per turn).</p>";
+      var k = i - 1, prev = P[k], T = T0 * Math.pow(0.97, k);
+      var dir = DN[run.d[k]], a = run.a[k];
+      var line = "<p><strong>Turn " + i + ".</strong> Draw " + dir + " (heat " + T.toFixed(2) + "). ";
+      if (a === 2) line += "That is off the map, so stay put.</p>";
+      else {
+        var tgt = [prev[0] + DV[run.d[k]][0], prev[1] + DV[run.d[k]][1]], delta = G[tgt[0]][tgt[1]] - at(prev);
+        if (delta >= 0) line += "Safety " + at(prev) + " → " + G[tgt[0]][tgt[1]] + " is not downhill, so move.</p>";
+        else {
+          var pr = Math.exp(delta / T);
+          line += "Downhill by " + (-delta) + ": accept with chance e<sup>" + MINUS + (-delta) + "/" + T.toFixed(1) + "</sup> = " + pr.toFixed(3) +
+                  ". Drew " + run.r[k].toFixed(4) + ", so " + (a === 1 ? "<strong>accept</strong>." : "reject.") + "</p>";
+        }
+      }
+      if (i === P.length - 1) line += "<p>After 200 turns: at (" + run.final + ") with safety " + run.finalValue + ", best seen " + run.best + ", " + run.accepted + " moves accepted.</p>";
+      return line;
+    }
+
+    function controls() {
+      var el = $("wCtl");
+      if (W.mode === "hc") {
+        el.innerHTML = '<span class="ctl-label">Start cell</span><div class="seg" role="group" aria-label="Start cell">' +
+          M.climbs.map(function (c, i) {
+            return '<button type="button" data-i="' + i + '" aria-pressed="' + (i === W.start) + '">(' + c.start + ")</button>";
+          }).join("") + "</div>";
+        Array.prototype.forEach.call(el.querySelectorAll("button"), function (b) {
+          b.addEventListener("click", function () { stop(); W.start = +b.getAttribute("data-i"); W.step = last(); render(); });
+        });
+      } else {
+        el.innerHTML = '<span class="ctl-label">Start heat</span><div class="seg" role="group" aria-label="Start heat">' +
+          Object.keys(M.runs).map(function (k) {
+            return '<button type="button" data-h="' + k + '" aria-pressed="' + (k === W.heat) + '">' + k + "</button>";
+          }).join("") + '</div><div style="flex-basis:100%"><span class="ctl-label">Seed (shaded = reached ' + hi + ")</span></div>" +
+          '<div class="seeds" role="group" aria-label="Seed">' +
+          Object.keys(M.runs[W.heat]).map(function (k) {
+            var ok = M.runs[W.heat][k].finalValue === hi;
+            return '<button type="button" class="seed' + (ok ? " ok" : "") + '" data-s="' + k + '" aria-pressed="' + (+k === W.seed) +
+                   '" aria-label="Seed ' + k + (ok ? ", reached " + hi : ", did not reach " + hi) + '">' + k + "</button>";
+          }).join("") + "</div>";
+        Array.prototype.forEach.call(el.querySelectorAll("[data-h]"), function (b) {
+          b.addEventListener("click", function () { stop(); W.heat = b.getAttribute("data-h"); W.step = last(); render(); });
+        });
+        Array.prototype.forEach.call(el.querySelectorAll("[data-s]"), function (b) {
+          b.addEventListener("click", function () { stop(); W.seed = +b.getAttribute("data-s"); W.step = last(); render(); });
+        });
+      }
+    }
+
+    function render() {
+      var L = last(); if (W.step > L) W.step = L;
+      draw();
+      $("wNote").innerHTML = note();
+      controls();
+      $("wHc").setAttribute("aria-pressed", String(W.mode === "hc"));
+      $("wSa").setAttribute("aria-pressed", String(W.mode === "sa"));
+      var cl = M.climbs[W.start], run = saRun();
+      if (W.mode === "hc") {
+        $("wTitle").innerHTML = "Hill climbing from (" + cl.start + ') <span class="chip' + (cl.value === hi ? " win" : "") + '">' +
+          (cl.value === hi ? "summit " + cl.value : "stuck at " + cl.value) + "</span>";
+        $("wMini").textContent = "Random restart tries all four starts: best " + bestClimb.value + " from (" + M.bestStart +
+          "), " + M.climbs.reduce(function (a, c) { return a + c.steps; }, 0) + " steps in total.";
+        $("wCount").textContent = "step " + W.step + " / " + L;
+      } else {
+        $("wTitle").innerHTML = "Annealing, heat " + W.heat + ", seed " + W.seed + ' <span class="chip' + (run.finalValue === hi ? " win" : "") + '">' +
+          (run.finalValue === hi ? "ends on " + run.finalValue : "ends on " + run.finalValue) + "</span>";
+        $("wMini").textContent = "Seeds 1 to 20 at heat " + W.heat + ": " + M.success[W.heat] + " of 20 finish on the summit. A hotter start explores more before it settles.";
+        $("wCount").textContent = "turn " + W.step + " / " + L;
+      }
+      var sc = $("wScrub"); sc.max = L; sc.value = W.step;
+      $("wBack").disabled = W.step === 0;
+      $("wPlay").textContent = W.timer ? "Pause" : (W.step >= L ? "Replay" : "Play");
+    }
+    function stop() { if (W.timer) { clearInterval(W.timer); W.timer = null; } }
+    function setMode(m) { stop(); W.mode = m; W.step = last(); render(); }
+
+    $("wHc").addEventListener("click", function () { setMode("hc"); });
+    $("wSa").addEventListener("click", function () { setMode("sa"); });
+    $("wBack").addEventListener("click", function () { stop(); W.step = Math.max(0, W.step - 1); render(); });
+    $("wScrub").addEventListener("input", function (e) { stop(); W.step = +e.target.value; render(); });
+    $("wPlay").addEventListener("click", function () {
+      if (W.timer) { stop(); render(); return; }
+      if (W.step >= last()) W.step = 0;
+      W.timer = setInterval(function () {
+        if (W.step >= last()) { stop(); render(); return; }
+        W.step += 1; render();
+      }, W.mode === "hc" ? 600 : 70);
+      render();
+    });
+    W.step = last();
+    render();
+  })();
+
+  /* ---------- Mission 2: Rin's seedcraft ---------- */
+  (function () {
+    var M = D.m2, n = M.best.length - 1, Q = { gen: n, timer: null };
+    var x0 = 40, x1 = 388, y0 = 14, y1 = 238;
+    var ymin = Math.floor(Math.min.apply(null, M.avg) / 20) * 20;
+    var ymax = Math.ceil(Math.max(M.opt.fitness, Math.max.apply(null, M.best)) / 10) * 10;
+    function X(g) { return x0 + g / n * (x1 - x0); }
+    function Y(v) { return y1 - (v - ymin) / (ymax - ymin) * (y1 - y0); }
+    function line(a) { return a.map(function (v, g) { return X(g).toFixed(1) + "," + Y(v).toFixed(1); }).join(" "); }
+
+    function chart() {
+      var svg = "";
+      for (var v = ymin; v <= ymax; v += 20) {
+        svg += '<line class="gridl" x1="' + x0 + '" x2="' + x1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text x="' + (x0 - 6) + '" y="' + (Y(v) + 3) + '" text-anchor="end">' + v + "</text>";
+      }
+      for (var g = 0; g <= n; g += 10) svg += '<text x="' + X(g) + '" y="' + (y1 + 16) + '" text-anchor="middle">' + g + "</text>";
+      svg += '<text x="' + ((x0 + x1) / 2) + '" y="' + (y1 + 30) + '" text-anchor="middle">generation</text>';
+      svg += '<path class="axis" d="M' + x0 + "," + y0 + " V" + y1 + " H" + x1 + '"/>';
+      svg += '<line class="l-opt" x1="' + x0 + '" x2="' + x1 + '" y1="' + Y(M.opt.fitness) + '" y2="' + Y(M.opt.fitness) + '"/>' +
+             '<text class="l-opt-t" x="' + (x1 - 2) + '" y="' + (Y(M.opt.fitness) - 5) + '" text-anchor="end">true best ' + M.opt.fitness + "</text>";
+      svg += '<polyline class="l-avg" points="' + line(M.avg) + '"/><polyline class="l-best" points="' + line(M.best) + '"/>';
+      svg += '<line class="cur" x1="' + X(Q.gen) + '" x2="' + X(Q.gen) + '" y1="' + y0 + '" y2="' + y1 + '"/>' +
+             '<circle class="dot" cx="' + X(Q.gen) + '" cy="' + Y(M.best[Q.gen]) + '" r="5"/>';
+      $("chart").innerHTML = svg;
+    }
+
+    function pouch() {
+      var ch = M.chrom[Q.gen], load = 0, vol = 0, use = 0;
+      var rows = M.tools.map(function (t, i) {
+        var on = ch.charAt(i) === "1";
+        if (on) { load += t.load; vol += t.vol; use += t.use; }
+        return '<tr class="' + (on ? "on" : "off") + '"><td>' + (on ? "● " : "○ ") + t.name + "</td><td>" + t.use + "</td><td>" + t.load + "</td><td>" + t.vol + "</td></tr>";
+      }).join("");
+      var fits = load <= M.limits.load && vol <= M.limits.vol;
+      $("pouch").innerHTML = '<thead><tr><th>Tool</th><th>Use</th><th>Load</th><th>Vol</th></tr></thead><tbody>' + rows + "</tbody>" +
+        "<tfoot><tr><td>Pouch total</td><td>" + use + "</td><td>" + load + " / " + M.limits.load + "</td><td>" + vol + " / " + M.limits.vol + "</td></tr></tfoot>";
+      return { fits: fits, use: use };
+    }
+
+    function bits(label, str, other) {
+      return '<div class="bitrow"><span class="ctl-label">' + label + '</span><div class="bits">' +
+        str.split("").map(function (b, i) {
+          return '<span class="bit' + (b === "1" ? " one" : "") + (other && other.charAt(i) !== b ? " diff" : "") + '">' + b + "</span>";
+        }).join("") + "</div></div>";
+    }
+
+    function render() {
+      var g = Q.gen, p = pouch(), ga = M.ga, op = M.opt;
+      chart();
+      $("gTitle").innerHTML = "Generation " + g + ' <span class="chip' + (M.best[g] === op.fitness ? " win" : "") + '">best ' + M.best[g] + "</span>";
+      $("gNote").innerHTML = "<p>The best pouch in generation " + g + " scores <strong>" + M.best[g] + "</strong>; the whole population averages " +
+        M.avg[g].toFixed(2) + ". " + (p.fits ? "It fits both limits." : "It breaks a limit, so it would score 0.") + "</p>" +
+        (g === 0 ? "<p>Generation 0 is the seed population from the Scroll Box.</p>" : "");
+      var diffs = [];
+      for (var i = 0; i < 15; i++) if (ga.chromosome.charAt(i) !== op.chromosome.charAt(i)) diffs.push(M.tools[i].name);
+      $("gBits").innerHTML = bits("Shown", M.chrom[g], null) + bits("GA final", ga.chromosome, op.chromosome) + bits("True best", op.chromosome, ga.chromosome);
+      $("gMini").textContent = "Brute force tried all " + M.pouches.total.toLocaleString("en-US") + " pouches: " + M.pouches.feasible.toLocaleString("en-US") +
+        " fit, and only " + M.pouches.better + " beats the GA's " + ga.fitness + " (it scores " + op.fitness + "). Red outlines mark the " + diffs.length +
+        " tools where they disagree: " + diffs.join(", ") + ".";
+      var sc = $("gScrub"); sc.max = n; sc.value = g;
+      $("gCount").textContent = "gen " + g + " / " + n;
+      $("gBack").disabled = g === 0;
+      $("gPlay").textContent = Q.timer ? "Pause" : (g >= n ? "Replay" : "Play");
+    }
+    function stop() { if (Q.timer) { clearInterval(Q.timer); Q.timer = null; } }
+    $("gBack").addEventListener("click", function () { stop(); Q.gen = Math.max(0, Q.gen - 1); render(); });
+    $("gScrub").addEventListener("input", function (e) { stop(); Q.gen = +e.target.value; render(); });
+    $("gPlay").addEventListener("click", function () {
+      if (Q.timer) { stop(); render(); return; }
+      if (Q.gen >= n) Q.gen = 0;
+      Q.timer = setInterval(function () {
+        if (Q.gen >= n) { stop(); render(); return; }
+        Q.gen += 1; render();
+      }, 220);
+      render();
+    });
+    render();
+  })();
+
+  /* ---------- Stone Drop ---------- */
+  var S = { sel: best, step: 0 };
+  var startEmpty = D.start.join("").split(".").length - 1;
+
+  function stepsOf(m) {
+    return [{ p: null, col: null, row: null, board: D.start }].concat(m.steps);
+  }
+  S.step = stepsOf(D.moves[S.sel]).length - 1;
+
+  var colpick = $("colpick");
+  D.moves.forEach(function (m, i) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "colbtn";
+    b.innerHTML = "<b>" + m.col + "</b><small>" + (m.value > 0 ? "win " + "+" + m.value : "lose " + num(m.value)) + "</small>";
+    b.setAttribute("aria-label", "Drop in column " + m.col + ", value " + num(m.value));
+    b.addEventListener("click", function () {
+      S.sel = i; S.step = stepsOf(D.moves[i]).length - 1; renderStone();
+    });
+    colpick.appendChild(b);
+  });
+
+  function drawBoard(st, m, atEnd) {
+    var svg = '<rect class="frame" x="1.5" y="1.5" width="277" height="277"/>';
+    var cells = atEnd ? m.result.cells : [];
+    function cx(c) { return c * 56 + 28; }
+    function cy(r) { return (4 - r) * 56 + 28; }
+    if (cells.length) {
+      svg += '<line class="thread" x1="' + cx(cells[0][1]) + '" y1="' + cy(cells[0][0]) +
+             '" x2="' + cx(cells[3][1]) + '" y2="' + cy(cells[3][0]) + '"/>';
+    }
+    for (var i = 0; i < 5; i++) {
+      for (var c = 0; c < 5; c++) {
+        var ch = st.board[i][c], x = cx(c), y = i * 56 + 28;
+        svg += ch === "."
+          ? '<circle class="hole" cx="' + x + '" cy="' + y + '" r="19"/>'
+          : '<circle class="stone-' + ch.toLowerCase() + '" cx="' + x + '" cy="' + y + '" r="21"/>';
+      }
+    }
+    cells.forEach(function (rc) {
+      svg += '<circle class="win" cx="' + cx(rc[1]) + '" cy="' + cy(rc[0]) + '" r="27"/>';
+    });
+    if (st.row !== null && !cells.some(function (rc) { return rc[0] === st.row && rc[1] === st.col; })) {
+      svg += '<circle class="last" cx="' + cx(st.col) + '" cy="' + cy(st.row) + '" r="27"/>';
+    }
+    $("board").innerHTML = svg;
+  }
+
+  function stoneNote(m, steps) {
+    var st = steps[S.step], atEnd = S.step === steps.length - 1, r = m.result;
+    if (S.step === 0) {
+      return "<p><strong>Start.</strong> Pine team (X) to move with " + startEmpty +
+             " empty cells. Minimax tried every future from each of the five columns.</p>";
+    }
+    var who = st.p === "X" ? "Pine team (X)" : "Vesper (O)";
+    if (!atEnd) return "<p><strong>" + who + "</strong> drops in column " + st.col + ".</p>";
+    var out = "<p><strong>" + who + "</strong> drops in column " + st.col + " and completes four in a line.</p>";
+    if (r.winner === "X") {
+      out += "<p>" + r.empty + " empty cells left, so the win scores 1 + " + r.empty + " = " + num(r.utility) + ".</p>";
+    } else {
+      out += "<p>" + r.empty + " empty cells left, so the loss scores " + MINUS + "(1 + " + r.empty + ") = " + num(r.utility) + ".</p>";
+      if (steps.length === 2) out += "<p>Vesper wins on her very next stone.</p>";
+    }
+    return out;
+  }
+
+  function renderStone() {
+    var m = D.moves[S.sel], steps = stepsOf(m), st = steps[S.step], atEnd = S.step === steps.length - 1;
+    Array.prototype.forEach.call(colpick.children, function (b, i) { b.setAttribute("aria-pressed", String(i === S.sel)); });
+    drawBoard(st, m, atEnd);
+    $("board").setAttribute("aria-label", "Stone Drop board, step " + S.step + " of " + (steps.length - 1));
+    $("sTitle").innerHTML = "Drop in column " + m.col + ' <span class="chip' + (m.value > 0 ? " win" : "") + '">' +
+      (m.value > 0 ? "wins, value +" + m.value : "loses, value " + num(m.value)) + "</span>";
+    $("sNote").innerHTML = stoneNote(m, steps);
+    var sc = $("sScrub"); sc.max = steps.length - 1; sc.value = S.step;
+    $("sCount").textContent = "stone " + S.step + " / " + (steps.length - 1);
+    $("sBack").disabled = S.step === 0;
+    $("sFwd").disabled = atEnd;
+    var list = $("sMoves"); list.innerHTML = "";
+    steps.forEach(function (s, i) {
+      var li = document.createElement("li"), b = document.createElement("button");
+      b.type = "button"; b.className = "mv";
+      b.innerHTML = i === 0 ? "start" : '<span class="who">' + s.p + "</span>" + s.col;
+      if (i === S.step) b.setAttribute("aria-current", "step");
+      b.addEventListener("click", function () { S.step = i; renderStone(); });
+      li.appendChild(b); list.appendChild(li);
+    });
+    $("sMini").textContent = m.value > 0
+      ? "Value +" + m.value + ": the only column that lets the Pine team force a win."
+      : "Value " + num(m.value) + ": Vesper has a forced win after this move.";
+  }
+  $("sBack").addEventListener("click", function () { S.step = Math.max(0, S.step - 1); renderStone(); });
+  $("sFwd").addEventListener("click", function () { S.step += 1; renderStone(); });
+  $("sScrub").addEventListener("input", function (e) { S.step = +e.target.value; renderStone(); });
+  renderStone();
+
+  /* ---------- Ki spent ---------- */
+  (function () {
+    var c = D.counts;
+    function pct(a, b) { var p = a / b * 100; return (p >= 10 ? p.toFixed(0) : p.toFixed(1)) + "%"; }
+    function row(label, sub, n, max, cls, base) {
+      return '<div class="ki-row"><div class="ki-label">' + label + "<small>" + sub + "</small></div>" +
+        '<div class="ki-track"><div class="ki-bar ' + cls + '" style="width:' + Math.max(0.4, n / max * 100) + '%"></div></div>' +
+        '<div class="ki-num">' + num(n) + (base ? "<small>" + pct(n, base) + " of minimax</small>" : "<small>baseline</small>") + "</div></div>";
+    }
+    $("ki").innerHTML =
+      '<div class="ki-group"><h3>Whole game, to the end</h3>' +
+        row("Minimax", "columns 0 to 4", c.mm, c.mm, "", 0) +
+        row("Alpha-beta", "columns 0 to 4", c.ab1, c.mm, "ab", c.mm) +
+        row("Alpha-beta, middle first", "columns 2, 1, 3, 0, 4", c.ab2, c.mm, "ab", c.mm) + "</div>" +
+      '<div class="ki-group"><h3>Four moves ahead</h3>' +
+        row("Minimax", "depth 4 with evaluation", c.dl, c.dl, "", 0) +
+        row("Alpha-beta", "depth 4 with evaluation", c.ab3, c.dl, "ab", c.dl) + "</div>" +
+      '<p class="ki-take">Alpha-beta gives the same answers while reading ' + pct(c.ab1, c.mm) +
+      " of the positions. Trying the middle columns first saved only " + num(c.ab1 - c.ab2) +
+      " more, about " + pct(c.ab1 - c.ab2, c.ab1) + " of what alpha-beta already needed.</p>";
+  })();
+
+  /* ---------- Master Hyo's tree ---------- */
+  var idx = {};
+  (function walk(n, d, p) {
+    idx[n.name] = { n: n, d: d, p: p };
+    (n.children || []).forEach(function (ch) { walk(ch, d + 1, n.name); });
+  })(D.tree, 0, null);
+  function kindOf(name) { return idx[name].d % 2 === 0 ? "MAX" : "MIN"; }
+
+  var T = { mode: "lr", step: 0, timer: null };
+  function events() { return D.trace[T.mode]; }
+  T.step = events().length;
+
+  function markCut(name, st) {
+    st[name] = { s: "cut" };
+    (idx[name].n.children || []).forEach(function (ch) { markCut(ch.name, st); });
+  }
+  function stateAt(ev, upto) {
+    var st = {};
+    for (var i = 0; i < upto; i++) {
+      var e = ev[i];
+      if (e.k === "visit") st[e.n] = { s: "active", a: e.a, b: e.b };
+      else if (e.k === "leaf") st[e.n] = { s: "seen", v: e.v };
+      else {
+        var prev = st[e.n] || {};
+        st[e.n] = { s: "done", a: prev.a, b: prev.b, v: e.v, pruned: e.fired && e.skipped.length > 0 };
+        e.skipped.forEach(function (n) { markCut(n, st); });
+      }
+    }
+    return st;
+  }
+
+  function nodeHtml(n, st, cur) {
+    var s = st[n.name] || { s: "idle" };
+    var cls = "n " + (s.s === "idle" ? "idle" : s.s === "cut" ? "cut" : "active") + (n.name === cur ? " current" : "");
+    var head = '<div class="n-head"><span class="n-name">' + n.name + '</span><span class="n-kind">' + kindOf(n.name) + "</span>";
+    if (s.a !== undefined) head += '<span class="n-win">α ' + num(s.a) + "  β " + num(s.b) + "</span>";
+    if (s.s === "done") head += '<span class="n-val">= ' + num(s.v) + "</span>";
+    if (s.pruned) head += '<span class="tag">pruned</span>';
+    if (s.s === "cut") head += '<span class="n-win">skipped</span>';
+    head += "</div>";
+    var kids = n.children, body;
+    if (kids[0].value !== undefined) {
+      body = '<div class="leaves">' + kids.map(function (lf) {
+        var ls = st[lf.name] || { s: "idle" };
+        var c = "lf" + (ls.s === "seen" ? " seen" : ls.s === "cut" ? " cut" : "") + (lf.name === cur ? " current" : "");
+        return '<span class="' + c + '">' + lf.name + " " + num(lf.value) + "</span>";
+      }).join("") + "</div>";
+    } else {
+      body = '<div class="n-kids">' + kids.map(function (k) { return nodeHtml(k, st, cur); }).join("") + "</div>";
+    }
+    return '<div class="' + cls + '">' + head + body + "</div>";
+  }
+
+  function describe(e) {
+    if (!e) return "<p>Nothing searched yet. The root R is a MAX node with the full window " + MINUS + INFTY + " to " + INFTY + ".</p>";
+    var win = '<span class="mono">(α ' + num(e.a) + ", β " + num(e.b) + ")</span>";
+    if (e.k === "visit") return "<p>Call <strong>" + e.n + "</strong> (" + kindOf(e.n) + ") with window " + win + ".</p>";
+    if (e.k === "leaf") return "<p>Read leaf <strong>" + e.n + "</strong> = " + num(e.v) + ", inside window " + win + ".</p>";
+    var text = "<p><strong>" + e.n + "</strong> returns " + num(e.v) + ".</p>";
+    if (e.fired) {
+      var why = kindOf(e.n) === "MIN"
+        ? num(e.v) + " ≤ α (" + num(e.a) + "), so the MAX player above already has something better."
+        : num(e.v) + " ≥ β (" + num(e.b) + "), so the MIN player above will never allow this.";
+      text += "<p>The cut fires: " + why + " " +
+        (e.skipped.length ? "Skipped: " + e.skipped.join(", ") + "." : "Nothing is left to skip here.") + "</p>";
+    }
+    return text;
+  }
+
+  function renderTree() {
+    var ev = events(), st = stateAt(ev, T.step), e = T.step > 0 ? ev[T.step - 1] : null;
+    $("tree").innerHTML = nodeHtml(D.tree, st, e ? e.n : null);
+    $("tNote").innerHTML = describe(e);
+    var read = 0;
+    for (var i = 0; i < T.step; i++) if (ev[i].k === "leaf") read++;
+    var total = ev.filter(function (x) { return x.k === "leaf"; }).length;
+    $("tLeaves").textContent = "leaves read: " + read + " of 60" + (T.step === ev.length ? " (search finished: " + total + ")" : "");
+    var sc = $("tScrub"); sc.max = ev.length; sc.value = T.step;
+    $("tCount").textContent = "step " + T.step + " / " + ev.length;
+    $("tBack").disabled = T.step === 0;
+    $("tFwd").disabled = T.step === ev.length;
+    $("tPlay").textContent = T.timer ? "Pause" : (T.step === ev.length ? "Replay" : "Play");
+    $("mLr").setAttribute("aria-pressed", String(T.mode === "lr"));
+    $("mRl").setAttribute("aria-pressed", String(T.mode === "rl"));
+  }
+  function stopPlay() { if (T.timer) { clearInterval(T.timer); T.timer = null; } }
+  function setMode(m) { stopPlay(); T.mode = m; T.step = events().length; renderTree(); }
+
+  $("mLr").textContent = "Left to right · " + D.treeSummary.lrLeaves + " leaves";
+  $("mRl").textContent = "Right to left · " + D.treeSummary.rlLeaves + " leaves";
+  $("mLr").addEventListener("click", function () { setMode("lr"); });
+  $("mRl").addEventListener("click", function () { setMode("rl"); });
+  $("tBack").addEventListener("click", function () { stopPlay(); T.step = Math.max(0, T.step - 1); renderTree(); });
+  $("tFwd").addEventListener("click", function () { stopPlay(); T.step = Math.min(events().length, T.step + 1); renderTree(); });
+  $("tScrub").addEventListener("input", function (e) { stopPlay(); T.step = +e.target.value; renderTree(); });
+  $("tPlay").addEventListener("click", function () {
+    if (T.timer) { stopPlay(); renderTree(); return; }
+    if (T.step >= events().length) T.step = 0;
+    T.timer = setInterval(function () {
+      if (T.step >= events().length) { stopPlay(); renderTree(); return; }
+      T.step += 1; renderTree();
+    }, 500);
+    renderTree();
+  });
+  renderTree();
+})();
+</script>
