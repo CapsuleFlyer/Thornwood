@@ -74,6 +74,8 @@ def content(R):
              for i in range(3)]
     neigh = ", ".join(f"{name} {cell(rc)}={v}" for name, rc, v in q1["neighbours"])
     climbs = {c[0]: c for c in q1["climbs"]}
+    best_v = max(c[2] for c in q1["climbs"])
+    best_start = next(c[0] for c in q1["climbs"] if c[2] == best_v)     # first climb to reach it
     left = [
         ("p", f"**Where it stopped:** {cell(q1['stuck'])} with value **{q1['value']}**, after "
               f"{q1['steps']} steps (`HC_FINAL`, `HC_VALUE`, `HC_STEPS`). The climb went {path}. At (0,0) "
@@ -89,46 +91,50 @@ def content(R):
               f"a drop of {q1['dip']}, and steepest ascent never goes down. Restarting is the cure: the climbs "
               f"from (4,0), (7,0) and (0,4) end on {climbs[(4, 0)][2]}, {climbs[(7, 0)][2]} and "
               f"{climbs[(0, 4)][2]} after {climbs[(4, 0)][3]}, {climbs[(7, 0)][3]} and {climbs[(0, 4)][3]} "
-              f"steps, so the best of the four is 95 from (7,0), {sum(c[3] for c in q1['climbs'])} steps in "
+              f"steps, so the best of the four is {best_v} from {cell(best_start)}, {sum(c[3] for c in q1['climbs'])} steps in "
               "total (`RR_BEST_VALUE`, `RR_BEST_START`, `RR_TOTAL_STEPS`)."),
     ]
-    right = [("img", "hill_climb.png", 150,
+    right = [("img", "hill_climb.png", 175,
               "Climb from (0,0). Dashed box: start. Red ring: where it stopped. Black box: the real summit.")]
-    B.append(("cols", left, right, (0.70, 0.30)))
+    B.append(("cols", left, right, (0.66, 0.34)))
 
     # ------------------------------------------------------------ 2. Gennai
     B.append(("h", "2. Gennai: Why did only some of the 20 fate scrolls reach the summit?"))
     t20, t40 = q2["t20"], q2["t40"]
-    fails20 = ", ".join(f"{n(c)} runs on {cell(rc)}={v}" for (rc, v), c in t20["ends"].items() if v != 95)
-    fails40 = ", ".join(f"{n(c)} runs on {cell(rc)}={v}" for (rc, v), c in t40["ends"].items() if v != 95)
+    stuck_ends = [(rc, v) for (rc, v) in t20["ends"] if v != 95]
+    assert len(stuck_ends) == 1 and stuck_ends == [(q1["stuck"], q1["value"])]   # every failure is the Q1 peak
+    fails20 = f"{cell(stuck_ends[0][0])}={stuck_ends[0][1]}"
     sched = [[str(s["n"]), f"{s['T20']:.2f}", f"{s['p20']:.3f}", f"{s['T40']:.2f}", f"{s['p40']:.3f}"]
              for s in q2["schedule"]]
     sweep = [[f"T0 = {h}"] + [str(q2["sweep"][(h, c)]) for c in q2["coolings"]] for h in q2["heats"]]
     B.append(("bul", [
         f"**Result of the 20 seeded runs** (T0 = 20, cooling 0.97): **{t20['success']} of 20** end on 95 "
-        f"(`SA_SUCCESS_1_TO_20`). The other {20 - t20['success']} all freeze on the same false summit: {fails20}.",
+        f"(`SA_SUCCESS_1_TO_20`). The other {20 - t20['success']} all freeze on the same false summit, "
+        f"{fails20}, the one that trapped Kaito.",
         f"**How heat and cooling act.** A downhill step Δ < 0 is accepted with chance exp(Δ/T), and T becomes "
         f"0.97·T every iteration, so T = T0·0.97^n. Leaving the false summit means a drop of {q2['dip']} "
         f"(Q1), so the table gives the chance of accepting that step as the run cools.",
     ]))
     pair_left = [("table", ["Iteration n", "T (T0=20)", "chance of −17", "T (T0=40)", "chance of −17"], sched,
                   [0.18, 0.2, 0.22, 0.2, 0.2], ["c", "c", "c", "c", "c"], [])]
-    pair_right = [("table", ["successes of 20", "cooling 0.95", "0.97", "0.99"], sweep,
+    pair_right = [("table", ["successes of 20", "rate 0.95", "rate 0.97", "rate 0.99"], sweep,
                    [0.31, 0.27, 0.21, 0.21], ["l", "c", "c", "c"], [])]
     B.append(("cols", pair_left, pair_right, (0.52, 0.48)))
     B.append(("bul", [
-        f"Early on the walker is bold; after iteration 100 (T < 1) it is greedy. Accepted downhill moves per "
+        f"Early on the walker is bold; once T < 1 (after iteration {q2['below_one'][20]:.0f} for T0=20) it is "
+        f"greedy. Accepted downhill moves per "
         f"quarter of the run, summed over the 20 seeds: {', '.join(map(n, t20['downhill_by_quarter']))} "
         f"(T0=20) and {', '.join(map(n, t40['downhill_by_quarter']))} (T0=40). Once the chance of crossing "
         f"falls below 1% (after iteration {q2['dip_window_end'][20]:.0f} for T0=20, "
         f"{q2['dip_window_end'][40]:.0f} for T0=40) a run still on the 70-hill is frozen there.",
-        f"**Cooling rate** works the same way (right table). Fast cooling shuts the window early (3 of 20 at "
-        f"0.95) and slow cooling keeps it open (10 of 20 at 0.99). More heat is not always better: T0 = 80 with "
+        f"**Cooling rate** works the same way (right table). With T0 = 20, fast cooling shuts the window early "
+        f"({q2['sweep'][(20, 0.95)]} of 20 at 0.95) and slow cooling keeps it open "
+        f"({q2['sweep'][(20, 0.99)]} of 20 at 0.99). More heat is not always better: T0 = 80 with "
         f"0.99 gives only {q2['sweep'][(80, 0.99)]} of 20, because T is still {q2['end_temp_80_99']:.1f} after "
         "200 iterations and the walker is still wandering when the run stops. A good run is hot enough to "
         "cross the dip early, then cold enough to settle on the peak.",
         f"**Re-run with T0 = 40:** **{t40['success']} of 20** reach 95 (was {t20['success']}). The "
-        f"{20 - t40['success']} failures again all sit on (2,1)=70. The crossing window stays open for "
+        f"{20 - t40['success']} failures again all sit on {fails20}. The crossing window stays open for "
         f"{q2['dip_window_end'][40]:.0f} iterations instead of {q2['dip_window_end'][20]:.0f}, so more runs "
         f"cross before freezing and still have about {200 - round(q2['dip_window_end'][40])} iterations to "
         "climb and settle.",
@@ -156,7 +162,7 @@ def content(R):
     base_label, m2_label = "mutation 1/15 (assignment)", "mutation 2/15"
     left = [("table", ["Tool", "Load", "Vol", "Use", "GA", "Opt"], rows,
              [0.37, 0.14, 0.14, 0.11, 0.12, 0.12], ["l", "r", "r", "r", "c", "c"], sorted(diff))]
-    right = [("img", "ga_chart.png", 205,
+    right = [("img", "ga_chart.png", 215,
               "Best and average fitness per generation. The dotted line is the true best, 241."),
              ("p", f"The GA pouch is `{q3['ga']['bits']}` and the optimum is `{q3['opt']['bits']}`. "
                    "Shaded rows are the four tools where they disagree.")]
@@ -179,7 +185,7 @@ def content(R):
         f"the 20 breaking a limit (hence the average of {q3['ga']['avg']:.2f}).",
         f"**One fix: raise the mutation rate from 1/15 to 2/15 per bit.** On seed 12 the GA then reaches "
         f"{seed12[m2_label]['final']} at generation {seed12[m2_label]['first']}, while at 1/15 it stays on "
-        f"{seed12[base_label]['final']} even if run for 150 generations. Honest limits: over seeds 1 to 200 the "
+        f"{seed12['mutation 1/15, 150 generations']['final']} even if run for 150 generations. Honest limits: over seeds 1 to 200 the "
         f"hit rate only moves from {study[base_label]} to {study[m2_label]} of 200, and 3/15 is worse "
         f"({study['mutation 3/15']} of 200). Longer runs lift it to "
         f"{study['mutation 1/15, 150 generations']} of 200 but do not rescue seed 12."
@@ -197,16 +203,23 @@ def content(R):
         else:
             vrows.append([str(r["col"]), "+" + n(r["value"]), f"none wins; best defence `{reply}`",
                           f"X completes {', '.join(map(cell, r['cells']))} on a full board: +{r['utility']}"])
+    lost = [r for r in q4["rows"] if r["winner"] == "O"]
+    reply_col = lost[0]["line"][1][1]
+    assert all(r["line"][1][1] == reply_col and r["cells"] == lost[0]["cells"] for r in lost)
+    key_cell = next(rc for rc in lost[0]["cells"] if rc[1] == reply_col)
+    others = ", ".join(cell(rc) for rc in lost[0]["cells"] if rc != key_cell)
+    saver = next(r["col"] for r in q4["rows"] if r["winner"] == "X")
+    assert saver == reply_col
     left = [
-        ("p", "Vesper's diagonal (0,4), (1,3), (3,1) is one stone short, and the empty cell (2,2) is where a "
-              "stone dropped in column 2 lands. After any first move except column 2 she plays column 2 and "
-              "wins on her very next stone. Only column 2 blocks it."),
+        ("p", f"Vesper's diagonal {others} is one stone short, and the empty cell {cell(key_cell)} is where "
+              f"a stone dropped in column {reply_col} lands. After any first move except column {saver} she plays "
+              f"column {reply_col} and wins on her very next stone. Only column {saver} blocks it."),
         ("table", ["X's first move", "Value", "Vesper's reply", "Result"], vrows,
          [0.12, 0.10, 0.40, 0.38], ["c", "c", "l", "l"], [2]),
     ]
-    right = [("img", "board_x0.png", 120,
+    right = [("img", "board_x0.png", 135,
               "After X0, O2: Vesper's diagonal. The same picture holds for columns 1, 3 and 4.")]
-    B.append(("cols", left, right, (0.77, 0.23)))
+    B.append(("cols", left, right, (0.74, 0.26)))
 
     # ------------------------------------------------------------ 5. Jun
     B.append(("h", "5. Jun: Compare the ki (node counts)"))
@@ -235,8 +248,8 @@ def content(R):
         f"first move tried at a node is its best move (or, for the opponent, its refutation), and a fixed column "
         f"order is a weak guess at that: the best column depends on the position, not on being central. I tried "
         f"all 120 fixed orders: they range from {n(o['min'])} to {n(o['max'])} nodes (median "
-        f"{n(o['median'])}), and 0..4 and middle-first rank {o['rank_0_4']}th and {o['rank_mid']}th, both "
-        f"exactly average. Trying the truly best move first at every node would need only {n(o['perfect'])} "
+        f"{n(o['median'])}), and 0..4 and middle-first rank {o['rank_0_4']}th and {o['rank_mid']}th of 120, "
+        f"right in the middle of the pack. Trying the truly best move first at every node would need only {n(o['perfect'])} "
         f"nodes; the worst-first order needs {n(o['worst'])}.",
         f"**Master Hyo's tree, left to right** (hand trace below): value {q5['tree_value']} through branch "
         f"{q5['tree_move']}, {q5['lr_leaves']} leaves read; node B2 is called with window {win(*q5['b2'])}. "
@@ -253,7 +266,7 @@ def content(R):
                    f"{r['leaves']} / {r['total']}", cut])
     B.append(("cols", [
         ("table", ["Node", "Window in (α, β)", "Returns", "Leaves", "Cut"], tr,
-         [0.20, 0.27, 0.12, 0.13, 0.28], ["l", "c", "c", "c", "l"], []),
+         [0.19, 0.25, 0.16, 0.13, 0.27], ["l", "c", "c", "c", "l"], []),
     ], [
         ("table", ["Leaves read", "L→R", "R→L"], split_rows, [0.34, 0.33, 0.33], ["l", "c", "c"], []),
         ("p", f"**Why right to left reads fewer ({q5['rl_leaves']} against {q5['lr_leaves']}).** The order "
@@ -359,20 +372,20 @@ def build_pdf(blocks, path):
     def rl(text):
         text = html.escape(fix(text), quote=False)
         text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
-        text = re.sub(r"`(.+?)`", rf'<font name="{f_mono}" size="7.4">\1</font>', text)
+        text = re.sub(r"`(.+?)`", rf'<font name="{f_mono}" size="8.4">\1</font>', text)
         return text
 
     ink, grey, rule = colors.HexColor("#15171c"), colors.HexColor("#555a63"), colors.HexColor("#c1271d")
-    base = ParagraphStyle("base", fontName=f_reg, fontSize=8.3, leading=10.5, textColor=ink, spaceAfter=3)
-    bullet = ParagraphStyle("bul", parent=base, leftIndent=9, bulletIndent=0, spaceAfter=3.2)
-    h_style = ParagraphStyle("h", parent=base, fontName=f_bold, fontSize=10.4, leading=12.5,
-                             spaceBefore=6, spaceAfter=3)
-    cap = ParagraphStyle("cap", parent=base, fontSize=6.7, leading=8, textColor=grey, alignment=TA_CENTER)
-    cellb = ParagraphStyle("cell", parent=base, fontSize=7.3, leading=8.6, spaceAfter=0)
+    base = ParagraphStyle("base", fontName=f_reg, fontSize=9.3, leading=12.2, textColor=ink, spaceAfter=3.5)
+    bullet = ParagraphStyle("bul", parent=base, leftIndent=10, bulletIndent=0, spaceAfter=4)
+    h_style = ParagraphStyle("h", parent=base, fontName=f_bold, fontSize=11.8, leading=14,
+                             spaceBefore=9, spaceAfter=4, keepWithNext=1)
+    cap = ParagraphStyle("cap", parent=base, fontSize=7.6, leading=9, textColor=grey, alignment=TA_CENTER)
+    cellb = ParagraphStyle("cell", parent=base, fontSize=8.3, leading=10, spaceAfter=0)
     aligns = {"l": TA_LEFT, "r": TA_RIGHT, "c": TA_CENTER}
 
     page_w, page_h = A4
-    ml = mr = 34
+    ml = mr = 40
     avail = page_w - ml - mr
 
     def flow(block, width):
@@ -401,7 +414,7 @@ def build_pdf(blocks, path):
             style = [("BACKGROUND", (0, 0), (-1, 0), ink),
                      ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#b9bcc3")),
                      ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                     ("TOPPADDING", (0, 0), (-1, -1), 1.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6),
+                     ("TOPPADDING", (0, 0), (-1, -1), 2.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4),
                      ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]
             for i in range(1, len(data)):
                 style.append(("BACKGROUND", (0, i), (-1, i),
@@ -426,10 +439,10 @@ def build_pdf(blocks, path):
     story = []
     for b in blocks:
         if b[0] == "title":
-            story.append(Paragraph(rl(b[1]), ParagraphStyle("t", parent=base, fontName=f_bold, fontSize=16,
-                                                            leading=19, spaceAfter=2)))
-            story.append(Paragraph(rl(b[2]), ParagraphStyle("st", parent=base, fontSize=7.6, textColor=grey,
-                                                            spaceAfter=2)))
+            story.append(Paragraph(rl(b[1]), ParagraphStyle("t", parent=base, fontName=f_bold, fontSize=19,
+                                                            leading=22, spaceAfter=3)))
+            story.append(Paragraph(rl(b[2]), ParagraphStyle("st", parent=base, fontSize=8.4, textColor=grey,
+                                                            spaceAfter=4)))
         else:
             story.extend(flow(b, avail))
 
@@ -448,7 +461,7 @@ def build_pdf(blocks, path):
             total = len(self._pages)
             for st in self._pages:
                 self.__dict__.update(st)
-                self.setFont(f_reg, 6.8)
+                self.setFont(f_reg, 7.5)
                 self.setFillColor(grey)
                 self.drawString(ml, 18, "Thornwood Rescue: debrief")
                 self.drawRightString(page_w - mr, 18, f"page {self._pageNumber} of {total}")

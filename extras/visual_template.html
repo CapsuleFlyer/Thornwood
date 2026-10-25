@@ -187,7 +187,7 @@ h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
 .grid-svg .trail { fill: none; stroke: var(--red); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; opacity: .35; }
 .grid-svg .startring { fill: none; stroke: var(--ink); stroke-width: 3; stroke-dasharray: 4 3; }
 .grid-svg .peak { fill: none; stroke: var(--ink); stroke-width: 2.5; }
-.grid-svg .here { fill: var(--red); stroke: var(--panel); stroke-width: 2; }
+.grid-svg .here { fill: none; stroke: var(--red); stroke-width: 4; }
 .ctl { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
 .ctl-label { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); }
 .seeds { width: 100%; display: grid; grid-template-columns: repeat(10, 1fr); gap: 0; max-width: 420px; padding-right: 2px; }
@@ -257,7 +257,7 @@ h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
         </div>
         <svg class="grid-svg" id="gridSvg" viewBox="0 0 320 320" role="img" aria-label="Safety map"></svg>
         <ul class="legend">
-          <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="var(--red)"/></svg>Where the searcher is now</li>
+          <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="var(--red)" stroke-width="2.5"/></svg>Where the searcher is now</li>
           <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="var(--ink)" stroke-width="2"/></svg>Highest cell (95)</li>
           <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="3 2"/></svg>Start</li>
         </ul>
@@ -452,7 +452,7 @@ h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
       svg += '<rect class="peak" x="' + (peak[1] * CELL + 2) + '" y="' + (peak[0] * CELL + 2) + '" width="' + (CELL - 4) + '" height="' + (CELL - 4) + '"/>';
       svg += '<rect class="startring" x="' + (s0[0] - 17) + '" y="' + (s0[1] - 17) + '" width="34" height="34"/>';
       var h = ctr(P[i]);
-      svg += '<circle class="here" cx="' + h[0] + '" cy="' + h[1] + '" r="9"/>';
+      svg += '<circle class="here" cx="' + h[0] + '" cy="' + h[1] + '" r="15"/>';
       $("gridSvg").innerHTML = svg;
       $("gridSvg").setAttribute("aria-label", "Safety map, searcher at row " + P[i][0] + ", column " + P[i][1] + ", safety " + at(P[i]));
     }
