@@ -1,24 +1,17 @@
-"""Thornwood Rescue - Owl Cipher report.
+"""Thornwood Rescue: prints the 36-line Owl Cipher report.
 
-Python 3.10+, standard library only. Takes no input and prints only the
-36-line Owl Cipher report (Scroll Box 5).
-
-Randomness rule: create rng = random.Random(seed) and call ONLY rng.random().
-Whole number in 0..k-1: int(rng.random() * k). Draw in the exact order the
-scroll box describes, and make no other draws.
+Standard library only, no input. For randomness each run makes
+rng = random.Random(seed) and only ever calls rng.random().
 """
 
 import math
 import random
-import itertools  # noqa: F401  (allowed; remove if unused)
 
 INF = float("inf")
 
-# ======================================================================
-# DATA (typed exactly from the Scroll Boxes)
-# ======================================================================
+# ---- data from the scroll boxes ----
 
-# --- Scroll Box 1: safety map, GRID[row][col] ---
+# Scroll Box 1: safety map, GRID[row][col]
 GRID = [
     [52, 58, 52, 46, 40, 46, 53, 46],
     [58, 64, 58, 52, 46, 58, 60, 53],
@@ -29,10 +22,10 @@ GRID = [
     [53, 60, 67, 74, 81, 88, 95, 88],
     [46, 53, 60, 67, 74, 81, 88, 81],
 ]
-# Direction numbers 0,1,2,3 = up, right, down, left as (d_row, d_col)
+# directions 0..3 are up, right, down, left, as (row change, column change)
 DIRECTIONS = [(-1, 0), (0, 1), (1, 0), (0, -1)]
 
-# --- Scroll Box 2: tools as (load, volume, usefulness), index = tool number ---
+# Scroll Box 2: each tool is (load, volume, usefulness), list index = tool number
 TOOLS = [
     (18, 9, 36),   # 0 Kunai set
     (11, 8, 9),    # 1 Wire spool
@@ -63,7 +56,7 @@ GEN0 = [
     "000001000010100", "001000111111000",
 ]
 
-# --- Scroll Box 3: Stone Drop starting position (top row first) ---
+# Scroll Box 3: Stone Drop starting board, written top row first
 COLS, ROWS = 5, 5
 START_TOP_FIRST = [
     ".....",   # row 4
@@ -73,9 +66,8 @@ START_TOP_FIRST = [
     "OXXXO",   # row 0
 ]
 
-# --- Scroll Box 4, Part B: Master Hyo's trial tree ---
-# Leaf lists are in left-to-right order; leaves are named L1..L60 in that order.
-# R (MAX) -> A,B,C (MIN) -> x1,x2,.. (MAX) -> x1a,x1b,.. (MIN) -> leaves
+# Scroll Box 4 part B: Master Hyo's tree. Leaves are named L1..L60 from left to right.
+# Levels: R is MAX, A/B/C are MIN, then A1.. are MAX, then A1a.. are MIN, then leaves.
 TREE_SPEC = {
     "A": {
         "A1": {"A1a": [4, -27, -22], "A1b": [-28, 16, 13],
@@ -96,12 +88,10 @@ TREE_SPEC = {
 }
 
 
-# ======================================================================
-# MISSION 1: Lookout climb (Scroll Box 1)
-# ======================================================================
+# ---- mission 1: lookout climb ----
 
 def neighbours(r, c):
-    """Return in-map neighbours in up, right, down, left order."""
+    """In-map neighbours as (direction, cell), in up, right, down, left order."""
     result = []
     for direction, (dr, dc) in enumerate(DIRECTIONS):
         nr, nc = r + dr, c + dc
@@ -111,7 +101,7 @@ def neighbours(r, c):
 
 
 def hill_climb(start):
-    """Steepest-ascent hill climbing; return (final_cell, value, steps)."""
+    """Steepest-ascent hill climbing. Returns (final cell, value, steps)."""
     cell = start
     steps = 0
     while True:
@@ -131,7 +121,7 @@ def hill_climb(start):
 
 
 def random_restart(starts):
-    """Run hill climbing from each start and return best value, first start, total steps."""
+    """Hill climb from every start. Returns (best value, first start that reached it, total steps)."""
     best_value = None
     best_start = None
     total_steps = 0
@@ -145,7 +135,10 @@ def random_restart(starts):
 
 
 def simulated_annealing(seed, start_temperature=20.0):
-    """Run the specified 200-step simulated annealing procedure."""
+    """Simulated annealing for 200 iterations from (0,0).
+
+    Returns (final cell, final value, best value, accepted moves).
+    """
     rng = random.Random(seed)
     current = (0, 0)
     current_value = GRID[current[0]][current[1]]
@@ -176,7 +169,7 @@ def simulated_annealing(seed, start_temperature=20.0):
 
 
 def fate_test(seeds):
-    """Count seeded simulated-annealing runs ending at value 95."""
+    """Number of the given seeds whose annealing run ends on 95."""
     count = 0
     for seed in seeds:
         final_cell, final_value, _, _ = simulated_annealing(seed)
@@ -184,12 +177,11 @@ def fate_test(seeds):
             count += 1
     return count
 
-# ======================================================================
-# MISSION 2: Tool pouch (Scroll Box 2)
-# ======================================================================
+
+# ---- mission 2: tool pouch ----
 
 def fitness(chrom):
-    """Return usefulness if both pouch limits are respected; otherwise zero."""
+    """Total usefulness if the pouch is within both limits, otherwise 0."""
     total_load = 0
     total_volume = 0
     total_usefulness = 0
@@ -204,12 +196,12 @@ def fitness(chrom):
 
 
 def rank_population(pop):
-    """Indices ranked by fitness descending, then original position ascending."""
+    """Population indices, best fitness first. Ties keep the lower position."""
     return sorted(range(len(pop)), key=lambda i: (-fitness(pop[i]), i))
 
 
 def tournament(pop, rng):
-    """Select the fittest of three drawn positions; ties favor first drawn."""
+    """Draw three positions and return the fittest. A tie goes to the first drawn."""
     draws = [int(rng.random() * 20) for _ in range(3)]
     winner_index = draws[0]
     winner_fitness = fitness(pop[winner_index])
@@ -222,7 +214,7 @@ def tournament(pop, rng):
 
 
 def crossover(p1, p2, rng):
-    """Apply one-point crossover with probability 0.9, returning independent lists."""
+    """One-point crossover with chance 0.9, otherwise plain copies. Returns two new lists."""
     if rng.random() < 0.9:
         cut = int(rng.random() * 14) + 1
         child1 = list(p1[:cut]) + list(p2[cut:])
@@ -234,7 +226,7 @@ def crossover(p1, p2, rng):
 
 
 def mutate(chrom, rng):
-    """Mutate each bit independently with probability 1/15; return a new list."""
+    """Flip each bit with chance 1/15. Returns a new list."""
     child = list(chrom)
     for i in range(15):
         if rng.random() < 1 / 15:
@@ -243,7 +235,7 @@ def mutate(chrom, rng):
 
 
 def genetic_algorithm(seed=12, generations=50):
-    """Run the specified genetic algorithm and return data for GA report lines."""
+    """Run the genetic algorithm and return what the GA report lines need."""
     rng = random.Random(seed)
     population = [[int(bit) for bit in chromosome] for chromosome in GEN0]
     generation_best = {}
@@ -294,7 +286,7 @@ def genetic_algorithm(seed=12, generations=50):
 
 
 def brute_force_optimum():
-    """Find the exact best pouch by examining all 2^15 bit combinations."""
+    """Try all 2^15 pouches. Returns (best fitness, its chromosome)."""
     best_fitness = -1
     best_chromosome = None
     for mask in range(1 << 15):
@@ -305,47 +297,36 @@ def brute_force_optimum():
             best_chromosome = ''.join(map(str, chrom))
     return best_fitness, best_chromosome
 
-# ======================================================================
-# MISSION 3: Stone Drop (Scroll Box 3)
-# ======================================================================
-# The board is a list of 5 rows: board[row][col], and row 0 is the BOTTOM row
-# (stones fall towards row 0). Every cell is '.', 'X' or 'O'.
-# X (the Pine team) is the MAX player, O (Vesper) is the MIN player.
+
+# ---- mission 3: Stone Drop ----
+# The board is board[row][col] with row 0 at the bottom, so stones fall toward row 0.
+# Cells are '.', 'X' or 'O'. X (Pine team) maximises, O (Vesper) minimises.
 
 PLAYER_MAX = "X"
 PLAYER_MIN = "O"
-FULL_ORDER = [0, 1, 2, 3, 4]     # column order used by most runs
+FULL_ORDER = [0, 1, 2, 3, 4]     # column order for most runs
 MIDDLE_FIRST = [2, 1, 3, 0, 4]   # column order for run AB2
 
 
 def other_player(player):
-    """Return the opponent of `player` ('X' <-> 'O')."""
+    """The other player."""
     return PLAYER_MIN if player == PLAYER_MAX else PLAYER_MAX
 
 
 def initial_board():
-    """Build the starting board from START_TOP_FIRST.
-
-    The text is written with the top row first, so we reverse it to make
-    row 0 the bottom row, and turn each string into a list of characters.
-    """
+    """Starting board, with row 0 at the bottom (the text is written top row first)."""
     return [list(row) for row in reversed(START_TOP_FIRST)]
 
 
 def legal_moves(board, order):
-    """Columns in `order` that are not full.
-
-    A column is full when its top cell (row ROWS-1) is already taken, so
-    that is the only cell we need to look at.
-    """
+    """Columns from `order` that still have room (top cell empty)."""
     return [col for col in order if board[ROWS - 1][col] == "."]
 
 
 def drop(board, col, player):
-    """Return a NEW board with `player`'s stone dropped into column `col`.
+    """Copy of the board with the player's stone dropped into column `col`.
 
-    The stone falls to the lowest empty cell. We copy every row first so the
-    parent board is never changed (the search needs it back unchanged).
+    The original board is left alone because the search still needs it.
     """
     new_board = [row[:] for row in board]
     for row in range(ROWS):
@@ -356,11 +337,10 @@ def drop(board, col, player):
 
 
 def all_windows():
-    """Return the 28 four-cell windows (lines of four) of the 5x5 board.
+    """The 28 lines of four cells on the board: across, up and both diagonals.
 
-    A window is a start cell plus a direction: across, up, diagonal up-right
-    and diagonal up-left. It only counts if its last cell is still on the board.
-    Count: 10 across + 10 up + 4 + 4 diagonals = 28.
+    A window is a start cell plus a direction, kept only if its last cell is
+    on the board. That gives 10 across, 10 up and 4 + 4 diagonals.
     """
     windows = []
     for d_row, d_col in [(0, 1), (1, 0), (1, 1), (1, -1)]:
@@ -375,7 +355,7 @@ def all_windows():
     return windows
 
 
-# Built once, so the search never has to rebuild the windows.
+# computed once so the search doesn't rebuild it every time
 WINDOWS = all_windows()
 
 
@@ -389,11 +369,10 @@ def winner(board):
 
 
 def terminal_utility(board):
-    """Return the utility of a finished game, or None if the game goes on.
+    """Utility of a finished game, or None if play continues.
 
-    X wins -> 1 + E, O wins -> -(1 + E), full board with no line -> 0, where
-    E is the number of empty cells (so faster wins score higher).
-    NOTE: a draw returns 0, so callers must test `is not None`, never `if utility`.
+    X winning is 1 + E, O winning is -(1 + E) and a full board is 0, where E
+    is the number of empty cells. A draw is 0, so callers check `is not None`.
     """
     who = winner(board)
     empty = sum(row.count(".") for row in board)
@@ -407,11 +386,10 @@ def terminal_utility(board):
 
 
 def evaluate(board):
-    """Heuristic score of an unfinished position (used when depth runs out).
+    """Score for an unfinished position, used when the depth runs out.
 
-    Look at all 28 windows. A window with k >= 1 X stones and no O stone is
-    still open for X and adds k*k; the same for O subtracts k*k. Windows with
-    both colours (or none) are dead and add 0. Squaring rewards fuller lines.
+    For each of the 28 windows: k X stones and no O adds k*k, k O stones and
+    no X subtracts k*k, anything else adds 0.
     """
     score = 0
     for window in WINDOWS:
@@ -430,16 +408,14 @@ def evaluate(board):
 
 
 def minimax(board, player, order, counters):
-    """Full-depth minimax: search every line of play to the end of the game.
+    """Full minimax to the end of the game. X takes the highest child value, O the lowest.
 
-    X picks the child with the highest value and O the lowest, because we
-    assume Vesper always plays her best. Every call counts as a node, and
-    every finished position reached counts as a leaf. No memoization.
-    `counters` is a dict {"nodes": .., "leaves": ..} updated in place.
+    Every call is a node and every finished position is a leaf, with no
+    memoization. `counters` is {"nodes": .., "leaves": ..}, updated in place.
     """
     counters["nodes"] += 1
     utility = terminal_utility(board)
-    if utility is not None:                      # game over: this is a leaf
+    if utility is not None:                      # finished game, counts as a leaf
         counters["leaves"] += 1
         return utility
 
@@ -458,12 +434,10 @@ def minimax(board, player, order, counters):
 
 
 def minimax_depth(board, player, depth, order, counters):
-    """Depth-limited minimax: look `depth` moves ahead, then trust evaluate().
+    """Minimax that looks `depth` moves ahead and then falls back on evaluate().
 
-    A finished game returns utility * 1000 (so a real win or loss always beats
-    any heuristic guess). An unfinished position at depth 0 returns evaluate().
-    The finished-game test comes first, so a game that ends exactly at depth 0
-    is still scored as a real result.
+    A finished game scores utility * 1000. That check comes before the depth
+    check, so a game ending exactly at depth 0 still gets its real result.
     """
     counters["nodes"] += 1
     utility = terminal_utility(board)
@@ -487,27 +461,25 @@ def minimax_depth(board, player, depth, order, counters):
 
 
 def solve_minimax():
-    """Full minimax from the starting position, order 0,1,2,3,4.
+    """Full minimax from the start position, columns 0 to 4.
 
-    Returns (value, best_move, nodes, leaves). The root is handled here (not in
-    minimax) so we can remember WHICH column gave the best value. Best move =
-    the first column whose value is strictly better than every earlier column.
+    Returns (value, best move, nodes, leaves). The root loop lives here so it
+    can keep the first column whose value is strictly better than all earlier ones.
     """
     board = initial_board()
-    counters = {"nodes": 1, "leaves": 0}         # the root position is one node
+    counters = {"nodes": 1, "leaves": 0}         # the root counts as one node
     best_value, best_move = -INF, None
     for col in legal_moves(board, FULL_ORDER):
         value = minimax(drop(board, col, PLAYER_MAX), PLAYER_MIN, FULL_ORDER, counters)
-        if value > best_value:                   # strictly better -> ties keep the first
+        if value > best_value:                   # strictly better, so ties keep the first column
             best_value, best_move = value, col
     return best_value, best_move, counters["nodes"], counters["leaves"]
 
 
 def solve_depth_limited():
-    """Depth-4 minimax with the evaluation, order 0,1,2,3,4.
+    """Depth-4 minimax from the start position, columns 0 to 4.
 
-    Returns (value, best_move, nodes). The root has depth 4, so its children
-    are searched with depth 3.
+    Returns (value, best move, nodes). The root is depth 4, so its children get depth 3.
     """
     board = initial_board()
     counters = {"nodes": 1, "leaves": 0}
@@ -520,21 +492,18 @@ def solve_depth_limited():
     return best_value, best_move, counters["nodes"]
 
 
-# ======================================================================
-# MISSION 4: Alpha-beta (Scroll Box 4)
-# ======================================================================
-# Same game and same answers as minimax, but we skip branches that cannot
-# change the result. alpha = best value MAX is already sure of, beta = best
-# value MIN is already sure of.
+# ---- mission 4: alpha-beta ----
+# Same game and same answers as minimax, but branches that can't change the
+# result are skipped. alpha is the best value MAX is already sure of, beta is
+# the same for MIN.
 
 def alphabeta(board, player, depth, alpha, beta, order, counters):
-    """Fail-soft alpha-beta search for Stone Drop.
+    """Fail-soft alpha-beta for Stone Drop.
 
-    depth=None means search to the end of the game (finished games score as
-    plain utility). Otherwise it is the depth-limited version (finished games
-    score utility * 1000, depth 0 scores evaluate()).
-    MAX node: stop as soon as v >= beta. MIN node: stop as soon as v <= alpha.
-    Fail-soft: when we stop, return v itself, never alpha or beta.
+    depth=None searches to the end of the game. Otherwise it is depth-limited:
+    finished games score utility * 1000 and depth 0 scores evaluate().
+    A MAX node stops once v >= beta, a MIN node once v <= alpha, and in both
+    cases returns v itself.
     """
     counters["nodes"] += 1
     utility = terminal_utility(board)
@@ -551,7 +520,7 @@ def alphabeta(board, player, depth, alpha, beta, order, counters):
         for col in legal_moves(board, order):
             child = drop(board, col, player)
             v = max(v, alphabeta(child, other, child_depth, alpha, beta, order, counters))
-            if v >= beta:                        # MIN above will never allow this
+            if v >= beta:                        # the MIN parent would avoid this branch
                 return v
             alpha = max(alpha, v)
         return v
@@ -560,19 +529,18 @@ def alphabeta(board, player, depth, alpha, beta, order, counters):
     for col in legal_moves(board, order):
         child = drop(board, col, player)
         v = min(v, alphabeta(child, other, child_depth, alpha, beta, order, counters))
-        if v <= alpha:                           # MAX above already has better
+        if v <= alpha:                           # the MAX parent already has something better
             return v
         beta = min(beta, v)
     return v
 
 
 def solve_alphabeta(depth, order):
-    """Alpha-beta from the starting position. Returns (value, best_move, nodes).
+    """Alpha-beta from the start position. Returns (value, best move, nodes).
 
-    The root is an ordinary MAX node starting with alpha=-inf, beta=+inf. We
-    loop over its children here so we can remember the best column (first one
-    strictly better than all earlier ones). Pruned siblings return values <= alpha,
-    so they can never wrongly replace the best move.
+    The root is a plain MAX node with alpha=-inf and beta=inf. Its loop is
+    here so it can keep the first column that is strictly better than the
+    earlier ones.
     """
     board = initial_board()
     counters = {"nodes": 1, "leaves": 0}
@@ -584,25 +552,25 @@ def solve_alphabeta(depth, order):
                           alpha, beta, order, counters)
         if value > best_value:
             best_value, best_move = value, col
-        if best_value >= beta:                   # never true at the root (beta = inf)
+        if best_value >= beta:                   # can't happen at the root since beta is inf
             break
         alpha = max(alpha, best_value)
     return best_value, best_move, counters["nodes"]
 
 
 def build_tree():
-    """Turn TREE_SPEC into a tree of dicts, naming leaves L1..L60.
+    """Build the tree from TREE_SPEC as nested dicts, naming leaves L1..L60 left to right.
 
-    Internal node: {"name": .., "children": [..]}. Leaf: {"name": "L7", "value": 2}.
-    Leaves are numbered left to right in the order they appear in TREE_SPEC.
+    Internal nodes are {"name": .., "children": [..]}, leaves are {"name": "L7", "value": 2}.
     """
-    leaf_counter = [0]                            # list so the inner function can change it
+    leaf_counter = [0]                            # a list so make() can update it
 
     def make(name, spec):
-        if isinstance(spec, dict):                # more levels below
+        """Build one node, recursing into the levels below."""
+        if isinstance(spec, dict):                # not at the bottom yet
             return {"name": name,
                     "children": [make(k, v) for k, v in spec.items()]}
-        children = []                             # spec is a list of leaf values
+        children = []                             # bottom level: spec is a list of leaf values
         for value in spec:
             leaf_counter[0] += 1
             children.append({"name": f"L{leaf_counter[0]}", "value": value})
@@ -612,14 +580,13 @@ def build_tree():
 
 
 def tree_alphabeta(node, is_max, alpha, beta, log, windows, reverse=False):
-    """Fail-soft alpha-beta over Master Hyo's tree.
+    """Fail-soft alpha-beta on Master Hyo's tree.
 
-    `log` collects the names of evaluated leaves in the order they are reached.
-    `windows` maps each node's name to the (alpha, beta) it received when the
-    search called it. reverse=True visits children right to left.
+    `log` gets the leaf names in the order they are read, and `windows` stores
+    the (alpha, beta) each node was called with. reverse=True goes right to left.
     """
     windows[node["name"]] = (alpha, beta)
-    if "value" in node:                           # a leaf: read its value
+    if "value" in node:                           # leaf
         log.append(node["name"])
         return node["value"]
 
@@ -643,11 +610,10 @@ def tree_alphabeta(node, is_max, alpha, beta, log, windows, reverse=False):
 
 
 def solve_tree(reverse=False):
-    """Run alpha-beta on Master Hyo's tree from the root R (a MAX node).
+    """Alpha-beta over Master Hyo's tree from the root R (a MAX node).
 
-    Returns (value, best_move, leaves_evaluated, leaf_list, b2_window), where
-    best_move is A, B or C (first child strictly better than the earlier ones)
-    and b2_window is the (alpha, beta) that node B2 received.
+    Returns (value, best move A/B/C, leaves read, leaf list, B2's window).
+    The best move is the first child strictly better than the earlier ones.
     """
     root = build_tree()
     log, windows = [], {}
@@ -665,17 +631,15 @@ def solve_tree(reverse=False):
     return best_value, best_move, len(log), log, windows.get("B2")
 
 
-# ======================================================================
-# REPORT (Scroll Box 5): exactly 36 lines, nothing else printed
-# ======================================================================
+# ---- report: exactly 36 lines, nothing else is printed ----
 
 def fmt_cell(cell):
-    """(r,c) with no spaces."""
+    """Format a cell as (r,c) with no spaces."""
     return f"({cell[0]},{cell[1]})"
 
 
 def fmt_num(x):
-    """Write infinities as -inf and inf; everything else as an integer."""
+    """Infinities as inf and -inf, anything else with str()."""
     if x == INF:
         return "inf"
     if x == -INF:
@@ -684,25 +648,25 @@ def fmt_num(x):
 
 
 def main():
-    """Run all four missions and print the Owl Cipher report."""
-    # --- Mission 1 ---
+    """Run the four missions and print the report."""
+    # mission 1
     hc_cell, hc_value, hc_steps = hill_climb((0, 0))
     rr_value, rr_start, rr_steps = random_restart([(0, 0), (4, 0), (7, 0), (0, 4)])
     sa_cell, sa_value, sa_best, sa_accepted = simulated_annealing(2)
     sa_success = fate_test(range(1, 21))
 
-    # --- Mission 2 ---
+    # mission 2
     ga = genetic_algorithm()
     opt_fitness, opt_chromosome = brute_force_optimum()
 
-    # --- Mission 3 ---
+    # mission 3
     mm_value, mm_move, mm_nodes, mm_leaves = solve_minimax()
     dl_value, dl_move, dl_nodes = solve_depth_limited()
 
-    # --- Mission 4 ---
+    # mission 4
     ab1 = solve_alphabeta(None, FULL_ORDER)       # full depth, columns 0..4
     ab2 = solve_alphabeta(None, MIDDLE_FIRST)     # full depth, middle first
-    ab3 = solve_alphabeta(4, FULL_ORDER)          # depth 4 with evaluation
+    ab3 = solve_alphabeta(4, FULL_ORDER)          # depth 4 with the evaluation
     tree_value, tree_move, lr_leaves, lr_list, b2_window = solve_tree()
     rl_leaves = solve_tree(reverse=True)[2]
 
